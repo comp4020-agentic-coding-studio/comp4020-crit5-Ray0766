@@ -15,6 +15,10 @@ export function cellIndex(grid: PathGrid, x: number, y: number): number {
   return y * grid.width + x;
 }
 
+export function cellXY(grid: PathGrid, index: number): [number, number] {
+  return [index % grid.width, Math.floor(index / grid.width)];
+}
+
 function neighborIndices(grid: PathGrid, index: number): number[] {
   const { width, height } = grid;
   const x = index % width;
