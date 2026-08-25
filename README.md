@@ -1,9 +1,7 @@
-# COMP4020 static prototype template
+# Sentinel
 
-A starter template for static-site prototypes in **COMP4020 / COMP8020 Agentic
-Coding Studio**. The course provisions a repo from this template for each
-deliverable --- you don't create it yourself. The `start` course skill clones it
-for you; from there, build your prototype and deploy it to GitHub Pages.
+A COMP4020 crit prototype, built on the course's static-site template and
+deployed to GitHub Pages.
 
 ## CI and Pages only turn on when you ship
 
@@ -43,25 +41,13 @@ problems with mise.
 
 ## What's here
 
-- `index.html`, `styles.css`, `main.ts` --- a minimal starting site. Replace it.
-- `mise.toml` --- the tested Node and pnpm versions for this template.
-- `spec/` --- what the checks are for (`README.md`) and the shipped invariants
-  (`invariants.test.ts`); the spec tests you write live alongside them.
-- `CLAUDE.md` --- orients whoever works in this repo, you or a coding agent.
-  Yours to grow.
-- `PROCESS.md` --- a template for your process overview, showing the
-  cited-moment format. Replace it with your own; `pnpm check:evidence` verifies
-  your citations resolve.
+- `index.html`, `styles.css`, `main.ts` --- the page and its bootstrap.
+- `src/` --- the game itself: grid pathing, state, rendering, input.
+- `spec/` --- the shipped invariants (`invariants.test.ts`) plus the one rule
+  this round's tests cover (`no-blockade.test.ts`).
+- `CLAUDE.md` --- orients whoever works in this repo.
+- `PROCESS.md` --- this round's process overview.
 - `.github/workflows/checks.yml` --- the CI sensors that run on every push once
-  your repo is public, and the GitHub Pages deploy.
+  the repo is public, and the GitHub Pages deploy.
 - `.githooks/pre-commit` --- blocks any commit that contains something shaped
-  like an API key, so your COMP4020 key can't end up in a public repo. Installed
-  automatically by `pnpm install`.
-
-This template is SSG-agnostic: plain HTML/CSS/TypeScript on Vite, so you can add
-Astro, Eleventy, or any static generator later without changing how it deploys.
-The course plugin's `stack` skill performs the swap for you — to the course
-default (Astro) or bare HTML/CSS — with the Pages base path, lockfile, and CI
-link check handled.
-
-See the course site for how the checks map to each week of the course.
+  like an API key. Installed automatically by `pnpm install`.
