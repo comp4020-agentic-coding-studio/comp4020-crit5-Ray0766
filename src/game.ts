@@ -6,19 +6,28 @@ import {
   ENTRANCES,
   GRID_SIZE,
   MAX_UNIT_LEVEL,
-  MERGE_COST,
-  PLACE_COST,
+  PLACE_COST_BASE,
+  PLACE_COST_GROWTH_ADD,
+  PLACE_COST_GROWTH_MULT,
   RESOURCE_ORB_LIFETIME,
-  RESOURCE_ORB_VALUE,
   RESOURCE_PICKUP_RADIUS_CELLS,
   SPAWN_INTERVAL_SECONDS,
   START_RESOURCE,
   TOTAL_WAVES,
   UNIT_LEVELS,
   WAVE_GAP_SECONDS,
+  resourceOrbValue,
   waveConfig,
 } from "./constants";
-import { canPlaceUnit, cellIndex, distanceFromCore, type CellKind, type PathGrid } from "./pathing";
+import {
+  canPlaceUnit,
+  cellIndex,
+  cellXY,
+  distanceFromCore,
+  hasOpenPath,
+  type CellKind,
+  type PathGrid,
+} from "./pathing";
 
 export interface Unit {
   level: number; // 1..MAX_UNIT_LEVEL
@@ -34,6 +43,7 @@ export interface Enemy {
   hp: number;
   maxHp: number;
   speed: number; // cells per second
+  boss?: boolean;
 }
 
 export interface ResourceOrb {
@@ -49,6 +59,27 @@ export interface AttackFlash {
   fromY: number;
   toX: number;
   toY: number;
+  ttl: number;
+}
+
+// Short-lived pings for things that happened this instant — a swap that
+// landed, a kill, a click with nothing to spend. render/ code watches this
+// array the same way it already watches `flashes`, to decide what to burst,
+// shake or play a sound for.
+export type FxKind =
+  | "place"
+  | "place-denied"
+  | "merge"
+  | "swap"
+  | "kill"
+  | "boss-kill"
+  | "core-hit"
+  | "boss-spawn";
+
+export interface FxEvent {
+  kind: FxKind;
+  x: number;
+  y: number;
   ttl: number;
 }
 
@@ -71,8 +102,10 @@ export class Game {
   enemies: Enemy[] = [];
   orbs: ResourceOrb[] = [];
   flashes: AttackFlash[] = [];
+  fx: FxEvent[] = [];
 
   resource = START_RESOURCE;
+  placeCost = PLACE_COST_BASE;
   coreHp = CORE_MAX_HP;
   status: GameStatus = "playing";
 
@@ -92,35 +125,65 @@ export class Game {
     this.distanceField = distanceFromCore(this.grid);
   }
 
-  /** Attempt to place a fresh level-1 unit on an empty cell. */
+  private pushFx(kind: FxKind, x: number, y: number): void {
+    this.fx.push({ kind, x, y, ttl: 0.15 });
+  }
+
+  /** Attempt to place a fresh level-1 unit on an empty cell. Cost climbs
+   *  after every successful placement; a click with nothing to spend just
+   *  pings "place-denied" instead of placing. */
   tryPlaceUnit(x: number, y: number): boolean {
     if (this.status !== "playing") return false;
-    if (this.resource < PLACE_COST) return false;
     if (!canPlaceUnit(this.grid, x, y)) return false;
+    if (this.resource < this.placeCost) {
+      this.pushFx("place-denied", x, y);
+      return false;
+    }
     const index = cellIndex(this.grid, x, y);
     this.units.set(index, { level: 1, cooldown: 0 });
-    this.resource -= PLACE_COST;
+    this.resource -= this.placeCost;
+    this.placeCost = Math.round(this.placeCost * PLACE_COST_GROWTH_MULT + PLACE_COST_GROWTH_ADD);
     this.rebuildGrid();
+    this.pushFx("place", x, y);
     return true;
   }
 
-  /** Drag a placed unit onto another placed unit: the target levels up,
-   *  the source is consumed and its cell stays blocked for good. */
+  /** Drag a placed unit onto another placed unit. Same level: they fuse, the
+   *  source is consumed and its cell stays blocked for good. Different
+   *  levels: they just swap places instead, for free — unless the swap would
+   *  leave every entrance sealed off, in which case it's reverted. */
   tryMergeUnit(fromIndex: number, toIndex: number): boolean {
     if (this.status !== "playing") return false;
     if (fromIndex === toIndex) return false;
     const source = this.units.get(fromIndex);
     const target = this.units.get(toIndex);
     if (!source || !target) return false;
-    if (target.level >= MAX_UNIT_LEVEL) return false;
-    if (this.resource < MERGE_COST) return false;
 
-    this.units.delete(fromIndex);
-    this.scars.add(fromIndex);
-    target.level += 1;
-    target.cooldown = 0;
-    this.resource -= MERGE_COST;
+    if (source.level === target.level) {
+      if (target.level >= MAX_UNIT_LEVEL) return false;
+      this.units.delete(fromIndex);
+      this.scars.add(fromIndex);
+      target.level += 1;
+      target.cooldown = 0;
+      this.rebuildGrid();
+      const [tx, ty] = cellXY(this.grid, toIndex);
+      this.pushFx("merge", tx, ty);
+      return true;
+    }
+
+    this.units.set(fromIndex, target);
+    this.units.set(toIndex, source);
     this.rebuildGrid();
+    if (!hasOpenPath(this.grid)) {
+      this.units.set(fromIndex, source);
+      this.units.set(toIndex, target);
+      this.rebuildGrid();
+      return false;
+    }
+    const [fromX, fromY] = cellXY(this.grid, fromIndex);
+    const [toX, toY] = cellXY(this.grid, toIndex);
+    this.pushFx("swap", fromX, fromY);
+    this.pushFx("swap", toX, toY);
     return true;
   }
 
@@ -154,6 +217,7 @@ export class Game {
     this.updateUnits(dt);
     this.updateOrbs(dt);
     this.updateFlashes(dt);
+    this.updateFx(dt);
     this.checkEndConditions();
   }
 
@@ -199,7 +263,9 @@ export class Game {
       hp: config.hp,
       maxHp: config.hp,
       speed: config.speedCellsPerSecond,
+      boss: config.boss,
     });
+    if (config.boss) this.pushFx("boss-spawn", ex, ey);
   }
 
   private updateEnemies(dt: number): void {
@@ -211,13 +277,20 @@ export class Game {
           id: this.nextOrbId++,
           x: enemy.x,
           y: enemy.y,
-          value: RESOURCE_ORB_VALUE,
+          value: resourceOrbValue(this.waveNumber),
           age: 0,
         });
+        this.pushFx(enemy.boss ? "boss-kill" : "kill", enemy.x, enemy.y);
         continue;
       }
       if (Math.round(enemy.x) === CORE_X && Math.round(enemy.y) === CORE_Y) {
-        this.coreHp = Math.max(0, this.coreHp - CORE_CONTACT_DAMAGE);
+        this.pushFx("core-hit", CORE_X, CORE_Y);
+        if (enemy.boss) {
+          // The boss reaching the core is an instant loss, not a scratch.
+          this.coreHp = 0;
+        } else {
+          this.coreHp = Math.max(0, this.coreHp - CORE_CONTACT_DAMAGE);
+        }
         continue;
       }
       survivors.push(enemy);
@@ -313,6 +386,15 @@ export class Game {
       if (flash.ttl > 0) alive.push(flash);
     }
     this.flashes = alive;
+  }
+
+  private updateFx(dt: number): void {
+    const alive: FxEvent[] = [];
+    for (const event of this.fx) {
+      event.ttl -= dt;
+      if (event.ttl > 0) alive.push(event);
+    }
+    this.fx = alive;
   }
 
   private checkEndConditions(): void {
