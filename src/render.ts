@@ -14,7 +14,7 @@ import { drawScoreSidebar } from "./render/score";
 import { drawSelector } from "./render/selector";
 import { tickShake } from "./render/shake";
 import { drawAttackTrails } from "./render/trails";
-import { drawVesselParticles, getVesselBaseLayer } from "./render/vessels";
+import { computeVesselPaths, drawVessels, drawVesselParticles } from "./render/vessels";
 
 export { computeLayout, type Layout };
 
@@ -22,16 +22,15 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   const layout = computeLayout(width, height);
   const t = performance.now() / 1000;
 
-  ctx.globalCompositeOperation = "source-over";
-  const base = getVesselBaseLayer(width, height, layout);
-  ctx.drawImage(base, 0, 0);
+  const vessels = computeVesselPaths(game, layout, t);
+  drawVessels(ctx, width, height, layout, vessels);
 
   const shakeOffset = tickShake(t);
   ctx.save();
   ctx.translate(shakeOffset.x, shakeOffset.y);
 
   ctx.globalCompositeOperation = "lighter";
-  drawVesselParticles(ctx, layout, t);
+  drawVesselParticles(ctx, layout, t, vessels);
   drawGrid(ctx, game, layout, t);
   drawOrbs(ctx, game, layout, t);
   drawPathogens(ctx, game, layout, t);

@@ -81,3 +81,50 @@ export function canPlaceUnit(grid: PathGrid, x: number, y: number): boolean {
   if (grid.cells[index] !== "empty") return false;
   return hasOpenPath(grid, index);
 }
+
+/**
+ * Walk an entrance's actual route to the core by always stepping to the
+ * neighbour with a smaller distanceField value — the same greedy rule
+ * `Game.pickNextTarget` uses to move a pathogen, just traced all at once
+ * instead of one step per frame. Used by render/vessels.ts so a vessel's
+ * drawn channel is the real BFS shortest path rather than a fixed curve.
+ * Returns null if this entrance currently has no path to the core at all.
+ */
+export function tracePathFromEntrance(
+  grid: PathGrid,
+  distanceField: Int32Array,
+  ex: number,
+  ey: number,
+): Array<[number, number]> | null {
+  const startIndex = cellIndex(grid, ex, ey);
+  if (distanceField[startIndex] === -1) return null;
+
+  const path: Array<[number, number]> = [[ex, ey]];
+  let x = ex;
+  let y = ey;
+  let guard = grid.width * grid.height;
+
+  while (distanceField[cellIndex(grid, x, y)] > 0 && guard-- > 0) {
+    const currentDist = distanceField[cellIndex(grid, x, y)];
+    const candidates: Array<[number, number]> = [
+      [x, y - 1],
+      [x, y + 1],
+      [x - 1, y],
+      [x + 1, y],
+    ];
+    let moved = false;
+    for (const [nx, ny] of candidates) {
+      if (nx < 0 || ny < 0 || nx >= grid.width || ny >= grid.height) continue;
+      const d = distanceField[cellIndex(grid, nx, ny)];
+      if (d !== -1 && d < currentDist) {
+        x = nx;
+        y = ny;
+        path.push([x, y]);
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) break; // stranded pocket, shouldn't happen for a reachable start
+  }
+  return path;
+}

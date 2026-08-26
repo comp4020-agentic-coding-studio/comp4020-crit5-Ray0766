@@ -3,8 +3,10 @@ import {
   CORE_MAX_HP,
   CORE_X,
   CORE_Y,
+  ELITE_HP_MULTIPLIER,
   ENTRANCES,
   GRID_SIZE,
+  MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
   PLACE_COST_BY_LEVEL,
   RESOURCE_ORB_LIFETIME,
@@ -18,6 +20,7 @@ import {
   TOTAL_WAVES,
   UNIT_LEVELS,
   WAVE_GAP_SECONDS,
+  entranceTier,
   resourceOrbValue,
   waveConfig,
 } from "./constants";
@@ -46,6 +49,7 @@ export interface Enemy {
   maxHp: number;
   speed: number; // cells per second
   boss?: boolean;
+  elite?: boolean;
 }
 
 export interface ResourceOrb {
@@ -287,17 +291,23 @@ export class Game {
   }
 
   private spawnEnemy(config: ReturnType<typeof waveConfig>): void {
-    const [ex, ey] = ENTRANCES[Math.floor(Math.random() * ENTRANCES.length)];
+    // The boss only ever comes through a major vessel; everything else picks
+    // from the full set, and lands elite if that roll happens to be major.
+    const pool = config.boss ? MAJOR_ENTRANCES : ENTRANCES;
+    const [ex, ey] = pool[Math.floor(Math.random() * pool.length)];
+    const elite = !config.boss && entranceTier(ex, ey) === "major";
+    const hp = elite ? Math.round(config.hp * ELITE_HP_MULTIPLIER) : config.hp;
     this.enemies.push({
       id: this.nextEnemyId++,
       x: ex,
       y: ey,
       targetX: ex,
       targetY: ey,
-      hp: config.hp,
-      maxHp: config.hp,
+      hp,
+      maxHp: hp,
       speed: config.speedCellsPerSecond,
       boss: config.boss,
+      elite,
     });
     if (config.boss) this.pushFx("boss-spawn", ex, ey);
   }

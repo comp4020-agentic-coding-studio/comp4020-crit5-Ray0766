@@ -1,56 +1,127 @@
-import { CORE_X, CORE_Y, ENTRANCES } from "../constants";
-import { hashAngle, mulberry32, sampleCubicBezier, type PathSample, type Point } from "./geometry";
+import {
+  CORE_X,
+  CORE_Y,
+  ENTRANCES,
+  entranceTier,
+  MAJOR_VESSEL_WIDTH_CELLS,
+  MINOR_VESSEL_WIDTH_CELLS,
+  type EntranceTier,
+} from "../constants";
+import type { Game } from "../game";
+import { tracePathFromEntrance } from "../pathing";
+import { mulberry32, sampleOpenCatmullRom, type PathSample, type Point } from "./geometry";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { rgba, VESSEL, VESSEL_GRAIN } from "./palette";
 
-interface VesselPath {
+export interface VesselPath {
   samples: PathSample[];
   width: number;
+  tier: EntranceTier;
 }
 
 const SAMPLE_COUNT = 90;
 const PARTICLE_COUNT = 24;
 const PARTICLE_CYCLE_SECONDS = 26;
+const TRANSITION_SECONDS = 0.35;
 
-function buildControlPoints(a: Point, b: Point, seed: number): [Point, Point, Point, Point] {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const nx = -dy / dist;
-  const ny = dx / dist;
-  const bend = dist * 0.14;
-  const s1 = Math.sin(seed);
-  const s2 = Math.sin(seed + 1.7);
-  return [
-    a,
-    { x: a.x + dx / 3 + nx * bend * s1, y: a.y + dy / 3 + ny * bend * s1 },
-    { x: a.x + (dx * 2) / 3 + nx * bend * s2, y: a.y + (dy * 2) / 3 + ny * bend * s2 },
-    b,
-  ];
+function easeInOutCubic(x: number): number {
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 }
 
-function buildVessels(layout: Layout): VesselPath[] {
-  const [coreX, coreY] = cellCenter(layout, CORE_X, CORE_Y);
-  const width = layout.cellSize * 0.5;
-  return ENTRANCES.map(([ex, ey], i) => {
-    const [ax, ay] = cellCenter(layout, ex, ey);
-    const [p0, p1, p2, p3] = buildControlPoints({ x: ax, y: ay }, { x: coreX, y: coreY }, i * 2.399);
-    return { samples: sampleCubicBezier(p0, p1, p2, p3, SAMPLE_COUNT), width };
+function lerpSamples(a: PathSample[], b: PathSample[], p: number): PathSample[] {
+  return a.map((sa, i) => {
+    const sb = b[i];
+    return {
+      x: sa.x + (sb.x - sa.x) * p,
+      y: sa.y + (sb.y - sa.y) * p,
+      nx: sa.nx + (sb.nx - sa.nx) * p,
+      ny: sa.ny + (sb.ny - sa.ny) * p,
+      t: sb.t,
+    };
   });
 }
 
-function renderBaseLayer(
+interface EntranceVesselState {
+  tier: EntranceTier;
+  width: number;
+  rawKey: string;
+  fromSamples: PathSample[];
+  targetSamples: PathSample[];
+  transitionStart: number;
+}
+
+// Keyed by entrance coordinate, and deliberately never cleared on Game.reset
+// — a fresh run's channels just ease into their base shape like any other
+// path change, same as the selector and score modules' module-level state.
+const states = new Map<string, EntranceVesselState>();
+
+function currentDisplay(state: EntranceVesselState, t: number): PathSample[] {
+  const p = Math.min(1, (t - state.transitionStart) / TRANSITION_SECONDS);
+  return lerpSamples(state.fromSamples, state.targetSamples, easeInOutCubic(p));
+}
+
+/** Recompute (or ease toward) every vessel's channel from the real BFS route
+ *  in pathing.ts. Call this once per frame; the result is shared by both the
+ *  channel-drawing pass and the particle pass so a particle is never seen
+ *  running along a channel shape that isn't actually on screen. */
+export function computeVesselPaths(game: Game, layout: Layout, t: number): VesselPath[] {
+  return ENTRANCES.map(([ex, ey]) => {
+    const key = `${ex},${ey}`;
+    const tier = entranceTier(ex, ey);
+    const width = (tier === "major" ? MAJOR_VESSEL_WIDTH_CELLS : MINOR_VESSEL_WIDTH_CELLS) * layout.cellSize;
+    let state = states.get(key);
+    const gridPath = tracePathFromEntrance(game.grid, game.distanceField, ex, ey);
+
+    if (gridPath) {
+      const rawKey = gridPath.map(([x, y]) => `${x}:${y}`).join("|");
+      if (!state || rawKey !== state.rawKey) {
+        const points: Point[] = gridPath.map(([x, y]) => {
+          const [px, py] = cellCenter(layout, x, y);
+          return { x: px, y: py };
+        });
+        const targetSamples = sampleOpenCatmullRom(points, SAMPLE_COUNT);
+        const fromSamples = state ? currentDisplay(state, t) : targetSamples;
+        state = { tier, width, rawKey, fromSamples, targetSamples, transitionStart: t };
+        states.set(key, state);
+      }
+    } else if (!state) {
+      // This entrance's very first frame already has no path to the core —
+      // shouldn't happen on a fresh board, but draw a straight stub instead
+      // of nothing rather than assume it can't.
+      const [ax, ay] = cellCenter(layout, ex, ey);
+      const [bx, by] = cellCenter(layout, CORE_X, CORE_Y);
+      const samples = sampleOpenCatmullRom(
+        [
+          { x: ax, y: ay },
+          { x: bx, y: by },
+        ],
+        SAMPLE_COUNT,
+      );
+      state = { tier, width, rawKey: "", fromSamples: samples, targetSamples: samples, transitionStart: t };
+      states.set(key, state);
+    }
+    // else: this entrance is currently cut off but has drawn before — leave
+    // it showing wherever its channel last settled instead of vanishing.
+
+    state.width = width;
+    return { samples: currentDisplay(state, t), width, tier };
+  });
+}
+
+/** The vessel channels themselves: background fill plus the glowing strokes.
+ *  Drawn fresh every frame now that the channel shape can move. */
+export function drawVessels(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   layout: Layout,
+  vessels: VesselPath[],
 ): void {
   ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, width, height);
 
   const scale = scaleFor(layout);
-  const vessels = buildVessels(layout);
   const passes: ReadonlyArray<readonly [number, number]> = [
     [2.3, 0.05],
     [1.5, 0.08],
@@ -73,31 +144,19 @@ function renderBaseLayer(
       ctx.restore();
     }
 
+    // Major mouths run brighter and wider, since they're the ones an elite
+    // (or the wave-8 boss) is about to come out of.
+    const mouthBoost = vessel.tier === "major" ? 1.5 : 1;
     const mouth = vessel.samples[0];
-    const mouthRadius = vessel.width * 1.6;
+    const mouthRadius = vessel.width * 1.6 * mouthBoost;
     const gradient = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, mouthRadius);
-    gradient.addColorStop(0, rgba(VESSEL, 0.14));
+    gradient.addColorStop(0, rgba(VESSEL, 0.14 * mouthBoost));
     gradient.addColorStop(1, rgba(VESSEL, 0));
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(mouth.x, mouth.y, mouthRadius, 0, Math.PI * 2);
     ctx.fill();
   }
-}
-
-let cache: { width: number; height: number; canvas: HTMLCanvasElement } | null = null;
-
-/** The static black-background-plus-vessels layer, rebuilt only when the canvas resizes. */
-export function getVesselBaseLayer(width: number, height: number, layout: Layout): HTMLCanvasElement {
-  if (cache && cache.width === width && cache.height === height) return cache.canvas;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const offscreenCtx = canvas.getContext("2d");
-  if (!offscreenCtx) throw new Error("2d context unavailable for offscreen vessel layer");
-  renderBaseLayer(offscreenCtx, width, height, layout);
-  cache = { width, height, canvas };
-  return canvas;
 }
 
 interface ParticleParams {
@@ -136,14 +195,19 @@ function sampleAlong(vessel: VesselPath, progress: number): PathSample {
   };
 }
 
-/** The flowing granules inside each vessel — dynamic, drawn fresh every frame. */
-export function drawVesselParticles(ctx: CanvasRenderingContext2D, layout: Layout, t: number): void {
+/** The flowing granules inside each vessel — dynamic, drawn fresh every
+ *  frame, riding along whatever channel shape computeVesselPaths produced
+ *  this frame so they never lag behind a path that just eased into a new
+ *  shape. */
+export function drawVesselParticles(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  t: number,
+  vessels: VesselPath[],
+): void {
   const scale = scaleFor(layout);
-  const vessels = buildVessels(layout);
 
   vessels.forEach((vessel, vesselIndex) => {
-    // A hash offset per vessel keeps particle phase from lining up across vessels.
-    void hashAngle(vesselIndex);
     for (let particleIndex = 0; particleIndex < PARTICLE_COUNT; particleIndex++) {
       const params = particleParams(vesselIndex, particleIndex);
       const speedPerSecond = params.speedFactor / PARTICLE_CYCLE_SECONDS;

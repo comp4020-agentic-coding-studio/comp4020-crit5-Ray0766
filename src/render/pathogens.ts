@@ -1,5 +1,5 @@
 import { ATTACK_FLASH_TTL, type Game } from "../game";
-import { BOSS_RADIUS_MULTIPLIER } from "../constants";
+import { BOSS_RADIUS_MULTIPLIER, ELITE_RADIUS_MULTIPLIER } from "../constants";
 import { mulberry32 } from "./geometry";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { MAGENTA, MAGENTA_CORE, rgba } from "./palette";
@@ -55,7 +55,12 @@ export function drawPathogens(
   const scale = scaleFor(layout);
 
   for (const enemy of game.enemies) {
-    const r = BODY_RADIUS_BASELINE * scale * (enemy.boss ? BOSS_RADIUS_MULTIPLIER : 1);
+    const sizeMultiplier = enemy.boss
+      ? BOSS_RADIUS_MULTIPLIER
+      : enemy.elite
+        ? ELITE_RADIUS_MULTIPLIER
+        : 1;
+    const r = BODY_RADIUS_BASELINE * scale * sizeMultiplier;
     const [cx, cy] = cellCenter(layout, enemy.x, enemy.y);
     const look = lookFor(enemy.id);
     const vertices: Array<{ x: number; y: number; angle: number; radius: number }> = [];

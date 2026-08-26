@@ -2,12 +2,42 @@ export const GRID_SIZE = 15;
 export const CORE_X = 7;
 export const CORE_Y = 7;
 
-// Three vessels converge on the core, entering from three different edges.
-export const ENTRANCES: ReadonlyArray<readonly [number, number]> = [
+// The three original vessels — top/left/right edge midpoints — carry the
+// heavier traffic: elite pathogens, and the only ones the wave-8 boss can
+// come through. Four thinner minor vessels near the corners carry ordinary
+// pathogens. Both sets are entrances on the pathing grid; nothing about BFS
+// cares which tier a given entrance is, only render/vessels.ts and the spawn
+// picker in game.ts do.
+export const MAJOR_ENTRANCES: ReadonlyArray<readonly [number, number]> = [
   [7, 0],
   [0, 7],
   [14, 7],
 ];
+
+export const MINOR_ENTRANCES: ReadonlyArray<readonly [number, number]> = [
+  [0, 1],
+  [14, 1],
+  [1, 14],
+  [13, 14],
+];
+
+export const ENTRANCES: ReadonlyArray<readonly [number, number]> = [
+  ...MAJOR_ENTRANCES,
+  ...MINOR_ENTRANCES,
+];
+
+export type EntranceTier = "major" | "minor";
+
+export function entranceTier(x: number, y: number): EntranceTier {
+  const isMajor = MAJOR_ENTRANCES.some(([ex, ey]) => ex === x && ey === y);
+  return isMajor ? "major" : "minor";
+}
+
+export const MAJOR_VESSEL_WIDTH_CELLS = 1.6;
+export const MINOR_VESSEL_WIDTH_CELLS = 0.7;
+
+export const ELITE_HP_MULTIPLIER = 2.2;
+export const ELITE_RADIUS_MULTIPLIER = 1.4;
 
 export const CORE_MAX_HP = 20;
 export const START_RESOURCE = 120;

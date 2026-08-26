@@ -86,6 +86,39 @@ export function catmullRomSegments(
   return segments;
 }
 
+/** Sample an open Catmull-Rom spline through `points` into `count` evenly
+ *  t-spaced points, each carrying a unit normal — same output shape as
+ *  sampleCubicBezier, but for a path with however many waypoints it happens
+ *  to have right now (a BFS route, which grows or shrinks as the board
+ *  changes) instead of a fixed 4-point curve. */
+export function sampleOpenCatmullRom(points: Point[], count: number): PathSample[] {
+  if (points.length === 0) return [];
+  if (points.length === 1) {
+    const p = points[0];
+    return Array.from({ length: count }, (_, i) => ({
+      x: p.x,
+      y: p.y,
+      nx: 0,
+      ny: -1,
+      t: count > 1 ? i / (count - 1) : 0,
+    }));
+  }
+  const segments = catmullRomSegments(points, false);
+  const samples: PathSample[] = [];
+  for (let i = 0; i < count; i++) {
+    const tGlobal = count > 1 ? i / (count - 1) : 0;
+    const segPos = tGlobal * segments.length;
+    const segIndex = Math.min(segments.length - 1, Math.floor(segPos));
+    const localT = segPos - segIndex;
+    const [p0, c1, c2, p1] = segments[segIndex];
+    const pos = bezierPoint(p0, c1, c2, p1, localT);
+    const tan = bezierTangent(p0, c1, c2, p1, localT);
+    const len = Math.hypot(tan.x, tan.y) || 1;
+    samples.push({ x: pos.x, y: pos.y, nx: -tan.y / len, ny: tan.x / len, t: tGlobal });
+  }
+  return samples;
+}
+
 /** Trace a rounded square (used for the placeable-cell highlight) into the current path. */
 export function tracePlaceableSquare(
   ctx: CanvasRenderingContext2D,
