@@ -11,7 +11,7 @@ export interface PathSample extends Point {
   t: number;
 }
 
-function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+export function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   const mt = 1 - t;
   const a = mt * mt * mt;
   const b = 3 * mt * mt * t;
@@ -23,7 +23,7 @@ function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Poi
   };
 }
 
-function bezierTangent(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+export function bezierTangent(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   const mt = 1 - t;
   const a = 3 * mt * mt;
   const b = 6 * mt * t;
@@ -51,6 +51,39 @@ export function sampleCubicBezier(
     samples.push({ x: pos.x, y: pos.y, nx: -tan.y / len, ny: tan.x / len, t });
   }
   return samples;
+}
+
+/** Cubic-bezier control points that make a Catmull-Rom spline through p1..p2. */
+function catmullRomToBezier(p0: Point, p1: Point, p2: Point, p3: Point): [Point, Point] {
+  const tension = 6;
+  return [
+    { x: p1.x + (p2.x - p0.x) / tension, y: p1.y + (p2.y - p0.y) / tension },
+    { x: p2.x - (p3.x - p1.x) / tension, y: p2.y - (p3.y - p1.y) / tension },
+  ];
+}
+
+/** Turn a handful of anchor points into cubic-bezier segments that pass smoothly
+ *  through every one of them (Catmull-Rom). `closed` loops the last point back
+ *  into the first instead of stopping there. Each returned segment is
+ *  [start, control1, control2, end], ready for ctx.bezierCurveTo. */
+export function catmullRomSegments(
+  points: Point[],
+  closed: boolean,
+): Array<[Point, Point, Point, Point]> {
+  const n = points.length;
+  const at = (i: number): Point =>
+    closed ? points[((i % n) + n) % n] : points[Math.max(0, Math.min(n - 1, i))];
+  const segCount = closed ? n : n - 1;
+  const segments: Array<[Point, Point, Point, Point]> = [];
+  for (let i = 0; i < segCount; i++) {
+    const p0 = at(i - 1);
+    const p1 = at(i);
+    const p2 = at(i + 1);
+    const p3 = at(i + 2);
+    const [c1, c2] = catmullRomToBezier(p0, p1, p2, p3);
+    segments.push([p1, c1, c2, p2]);
+  }
+  return segments;
 }
 
 /** Trace a rounded square (used for the placeable-cell highlight) into the current path. */

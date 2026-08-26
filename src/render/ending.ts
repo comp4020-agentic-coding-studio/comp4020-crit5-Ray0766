@@ -6,10 +6,9 @@
 import { CORE_X, CORE_Y } from "../constants";
 import type { Game, GameStatus } from "../game";
 import { playEnding } from "../audio";
+import { heartBodyPath } from "./heart";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { CYAN, CYAN_CORE, MAGENTA, MAGENTA_CORE, mix, rgba } from "./palette";
-
-const BODY_SEGMENTS = 26;
 
 const WIN_EXPAND_DURATION = 1.2; // spec: glow covers the screen in 1.2s
 const WIN_RETRACT_DURATION = 0.6;
@@ -40,20 +39,6 @@ function easeInOutCubic(x: number): number {
 
 function fullScreenRadius(width: number, height: number): number {
   return Math.hypot(width, height) * 0.75;
-}
-
-function heartBodyPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, t: number): void {
-  ctx.beginPath();
-  for (let i = 0; i <= BODY_SEGMENTS; i++) {
-    const a = (i / BODY_SEGMENTS) * Math.PI * 2;
-    const perturb = 1 + 0.05 * Math.sin(3 * a + 0.35 * t) + 0.035 * Math.sin(5 * a - 0.22 * t);
-    const rr = r * perturb;
-    const px = cx + Math.cos(a) * rr;
-    const py = cy + Math.sin(a) * rr;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
 }
 
 function drawWinEnding(
