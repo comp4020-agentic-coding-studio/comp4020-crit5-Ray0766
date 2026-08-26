@@ -3,6 +3,7 @@ import { unlockAudio } from "./audio";
 import type { Game } from "./game";
 import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
+import { getSelectedLevel, selectorHitTest, setSelectedLevel } from "./render/selector";
 
 const DRAG_THRESHOLD_PX = 8;
 
@@ -42,6 +43,11 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
     if (session) return;
     const { px, py } = toCanvasPixel(event.clientX, event.clientY);
     const layout = computeLayout(canvas.width, canvas.height);
+    const sidebarLevel = selectorHitTest(layout, px, py);
+    if (sidebarLevel !== -1) {
+      setSelectedLevel(sidebarLevel);
+      return;
+    }
     const { gx, gy } = toGridCoords(px, py, layout);
     session = {
       pointerId: event.pointerId,
@@ -81,7 +87,7 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
         game.tryMergeUnit(fromIndex, toIndex);
       }
     } else if (!game.tryCollectResource(gx, gy) && inBounds(endCellX, endCellY)) {
-      game.tryPlaceUnit(endCellX, endCellY);
+      game.tryPlaceUnit(endCellX, endCellY, getSelectedLevel());
     }
 
     canvas.releasePointerCapture(session.pointerId);

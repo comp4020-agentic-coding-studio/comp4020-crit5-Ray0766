@@ -129,19 +129,22 @@ export class Game {
     this.fx.push({ kind, x, y, ttl: 0.15 });
   }
 
-  /** Attempt to place a fresh level-1 unit on an empty cell. Price is flat
-   *  per level; a click with nothing to spend just pings "place-denied"
-   *  instead of placing. */
-  tryPlaceUnit(x: number, y: number): boolean {
+  /** Attempt to place a fresh unit of the given level on an empty cell.
+   *  Price is flat per level; a click with nothing to spend just pings
+   *  "place-denied" instead of placing. Goes through the same blockade
+   *  check regardless of level, so a level-3 placement can't seal off the
+   *  core any more than a level-1 one could. */
+  tryPlaceUnit(x: number, y: number, level = 1): boolean {
     if (this.status !== "playing") return false;
+    if (level < 1 || level > MAX_UNIT_LEVEL) return false;
     if (!canPlaceUnit(this.grid, x, y)) return false;
-    const cost = PLACE_COST_BY_LEVEL[0];
+    const cost = PLACE_COST_BY_LEVEL[level - 1];
     if (this.resource < cost) {
       this.pushFx("place-denied", x, y);
       return false;
     }
     const index = cellIndex(this.grid, x, y);
-    this.units.set(index, { level: 1, cooldown: 0 });
+    this.units.set(index, { level, cooldown: 0 });
     this.resource -= cost;
     this.rebuildGrid();
     this.pushFx("place", x, y);

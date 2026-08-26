@@ -5,7 +5,7 @@ import { cellCenter, scaleFor, type Layout } from "./layout";
 import { CYAN, CYAN_CORE, rgba } from "./palette";
 
 /** The one shape every immune-cell level is built from: a soft glow, a ring, a bright nucleus. */
-function drawLeaf(
+export function drawLeaf(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
@@ -43,7 +43,7 @@ function drawLeaf(
   ctx.restore();
 }
 
-function drawMembrane(
+export function drawMembrane(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,

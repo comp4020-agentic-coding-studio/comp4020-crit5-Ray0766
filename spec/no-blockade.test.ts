@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Game } from "../src/game";
 import { canPlaceUnit, hasOpenPath, type CellKind, type PathGrid } from "../src/pathing";
 
 // Hand-written fixtures: each character is one cell.
@@ -36,6 +37,18 @@ describe("the hard rule: a placement can never seal every entrance off from the 
 
     expect(canPlaceUnit(g, 2, 0)).toBe(true);
     expect(canPlaceUnit(g, 0, 2)).toBe(true);
+  });
+
+  it("rejects a level-3 placement at that same chokepoint too, not just level 1", () => {
+    // Same corridor as the first case above, but going through Game.tryPlaceUnit
+    // with a level-3 unit and money to spare, to prove the higher-level
+    // placement path is gated by the exact same blockade check.
+    const game = new Game();
+    game.grid = grid(["E####", ".####", ".####", "....C"]);
+    game.resource = 1000;
+
+    expect(game.tryPlaceUnit(2, 3, 3)).toBe(false);
+    expect(game.units.size).toBe(0);
   });
 });
 
