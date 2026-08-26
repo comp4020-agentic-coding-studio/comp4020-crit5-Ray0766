@@ -1,4 +1,5 @@
 import { GRID_SIZE } from "./constants";
+import { unlockAudio } from "./audio";
 import type { Game } from "./game";
 import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
@@ -37,6 +38,7 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
   }
 
   canvas.addEventListener("pointerdown", (event) => {
+    unlockAudio();
     if (session) return;
     const { px, py } = toCanvasPixel(event.clientX, event.clientY);
     const layout = computeLayout(canvas.width, canvas.height);

@@ -1,4 +1,5 @@
-import type { Game } from "../game";
+import { ATTACK_FLASH_TTL, type Game } from "../game";
+import { BOSS_RADIUS_MULTIPLIER } from "../constants";
 import { mulberry32 } from "./geometry";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { MAGENTA, MAGENTA_CORE, rgba } from "./palette";
@@ -6,6 +7,8 @@ import { MAGENTA, MAGENTA_CORE, rgba } from "./palette";
 const VERTEX_COUNT = 15;
 const BODY_RADIUS_BASELINE = 13;
 const SWAY_BASELINE = 1.5;
+const HP_RING_GAP = 7;
+const HIT_FLASH_DURATION = 0.08;
 
 interface PathogenLook {
   baseCoeffs: number[];
@@ -50,12 +53,17 @@ export function drawPathogens(
   t: number,
 ): void {
   const scale = scaleFor(layout);
-  const r = BODY_RADIUS_BASELINE * scale;
 
   for (const enemy of game.enemies) {
+    const r = BODY_RADIUS_BASELINE * scale * (enemy.boss ? BOSS_RADIUS_MULTIPLIER : 1);
     const [cx, cy] = cellCenter(layout, enemy.x, enemy.y);
     const look = lookFor(enemy.id);
     const vertices: Array<{ x: number; y: number; angle: number; radius: number }> = [];
+
+    const justHit = game.flashes.some(
+      (f) => f.targetId === enemy.id && ATTACK_FLASH_TTL - f.ttl < HIT_FLASH_DURATION,
+    );
+    const bodyColor = justHit ? MAGENTA_CORE : MAGENTA;
 
     for (let i = 0; i < VERTEX_COUNT; i++) {
       const angle = (i / VERTEX_COUNT) * Math.PI * 2;
@@ -72,7 +80,7 @@ export function drawPathogens(
     ctx.save();
     ctx.shadowColor = rgba(MAGENTA, 0.55);
     ctx.shadowBlur = 15 * scale;
-    ctx.fillStyle = rgba(MAGENTA, 0.3);
+    ctx.fillStyle = rgba(bodyColor, 0.3);
     ctx.beginPath();
     vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
     ctx.closePath();
@@ -82,7 +90,7 @@ export function drawPathogens(
     ctx.save();
     ctx.shadowColor = rgba(MAGENTA, 0.55);
     ctx.shadowBlur = 8 * scale;
-    ctx.strokeStyle = rgba(MAGENTA, 0.55);
+    ctx.strokeStyle = rgba(bodyColor, 0.55);
     ctx.lineWidth = 1 * scale;
     ctx.beginPath();
     vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
@@ -99,7 +107,7 @@ export function drawPathogens(
       const length = v.radius * 1.3;
       const tipX = v.x + Math.cos(v.angle) * length + perpX * sway;
       const tipY = v.y + Math.sin(v.angle) * length + perpY * sway;
-      ctx.strokeStyle = rgba(MAGENTA, 0.4);
+      ctx.strokeStyle = rgba(bodyColor, 0.4);
       ctx.lineWidth = 0.8 * scale;
       ctx.beginPath();
       ctx.moveTo(v.x, v.y);
@@ -115,5 +123,16 @@ export function drawPathogens(
     ctx.arc(cx, cy, r * 0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+
+    if (enemy.hp < enemy.maxHp) {
+      const sweep = Math.PI * 2 * Math.max(0, enemy.hp / enemy.maxHp);
+      ctx.save();
+      ctx.strokeStyle = rgba(MAGENTA, 0.9);
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + HP_RING_GAP * scale, -Math.PI / 2, -Math.PI / 2 + sweep, false);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 }
