@@ -6,9 +6,7 @@ import {
   ENTRANCES,
   GRID_SIZE,
   MAX_UNIT_LEVEL,
-  PLACE_COST_BASE,
-  PLACE_COST_GROWTH_ADD,
-  PLACE_COST_GROWTH_MULT,
+  PLACE_COST_BY_LEVEL,
   RESOURCE_ORB_LIFETIME,
   RESOURCE_PICKUP_RADIUS_CELLS,
   SPAWN_INTERVAL_SECONDS,
@@ -108,7 +106,6 @@ export class Game {
   fx: FxEvent[] = [];
 
   resource = START_RESOURCE;
-  placeCost = PLACE_COST_BASE;
   coreHp = CORE_MAX_HP;
   status: GameStatus = "playing";
 
@@ -132,20 +129,20 @@ export class Game {
     this.fx.push({ kind, x, y, ttl: 0.15 });
   }
 
-  /** Attempt to place a fresh level-1 unit on an empty cell. Cost climbs
-   *  after every successful placement; a click with nothing to spend just
-   *  pings "place-denied" instead of placing. */
+  /** Attempt to place a fresh level-1 unit on an empty cell. Price is flat
+   *  per level; a click with nothing to spend just pings "place-denied"
+   *  instead of placing. */
   tryPlaceUnit(x: number, y: number): boolean {
     if (this.status !== "playing") return false;
     if (!canPlaceUnit(this.grid, x, y)) return false;
-    if (this.resource < this.placeCost) {
+    const cost = PLACE_COST_BY_LEVEL[0];
+    if (this.resource < cost) {
       this.pushFx("place-denied", x, y);
       return false;
     }
     const index = cellIndex(this.grid, x, y);
     this.units.set(index, { level: 1, cooldown: 0 });
-    this.resource -= this.placeCost;
-    this.placeCost = Math.round(this.placeCost * PLACE_COST_GROWTH_MULT + PLACE_COST_GROWTH_ADD);
+    this.resource -= cost;
     this.rebuildGrid();
     this.pushFx("place", x, y);
     return true;
@@ -224,7 +221,6 @@ export class Game {
     this.flashes = [];
     this.fx = [];
     this.resource = START_RESOURCE;
-    this.placeCost = PLACE_COST_BASE;
     this.coreHp = CORE_MAX_HP;
     this.status = "playing";
     this.waveNumber = 0;

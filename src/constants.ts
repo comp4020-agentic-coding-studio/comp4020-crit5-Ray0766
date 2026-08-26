@@ -10,17 +10,17 @@ export const ENTRANCES: ReadonlyArray<readonly [number, number]> = [
 ];
 
 export const CORE_MAX_HP = 20;
-export const START_RESOURCE = 30;
+export const START_RESOURCE = 120;
 
-// A fresh level-1 placement starts at this cost, then climbs after every
-// successful one — cost = round(cost * PLACE_COST_GROWTH_MULT + PLACE_COST_GROWTH_ADD).
-// Merging (and the position swap below) stays free on top of that.
-export const PLACE_COST_BASE = 20;
-export const PLACE_COST_GROWTH_MULT = 1.16;
-export const PLACE_COST_GROWTH_ADD = 3;
+// Flat price per unit level, however it's reached. Merging (and the position
+// swap below) stays free on top of that, so building level 2/3 up through
+// merges is cheaper than buying the tier outright — 2x level-1 is 50 against
+// a direct 70, 4x level-1 is 100 against a direct 140 — without either path
+// being useless.
+export const PLACE_COST_BY_LEVEL: readonly number[] = [25, 70, 140];
 
-export const RESOURCE_ORB_VALUE_BASE = 4;
-export const RESOURCE_ORB_VALUE_PER_WAVE = 1;
+export const RESOURCE_ORB_VALUE_BASE = 8;
+export const RESOURCE_ORB_VALUE_PER_WAVE = 2;
 export function resourceOrbValue(waveNumber: number): number {
   return RESOURCE_ORB_VALUE_BASE + Math.max(0, waveNumber) * RESOURCE_ORB_VALUE_PER_WAVE;
 }
@@ -69,7 +69,7 @@ export function waveConfig(waveNumber: number): WaveConfig {
       boss: true,
     };
   }
-  return { count: 4 + waveNumber * 2, hp, speedCellsPerSecond };
+  return { count: 6 + waveNumber * 3, hp, speedCellsPerSecond };
 }
 
 export const CORE_CONTACT_DAMAGE = 1;
