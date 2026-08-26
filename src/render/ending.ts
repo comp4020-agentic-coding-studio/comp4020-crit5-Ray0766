@@ -6,7 +6,7 @@
 import { CORE_X, CORE_Y } from "../constants";
 import type { Game, GameStatus } from "../game";
 import { playEnding } from "../audio";
-import { heartBodyPath } from "./heart";
+import { drawHeartShape } from "./heart";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { CYAN, CYAN_CORE, MAGENTA, MAGENTA_CORE, mix, rgba } from "./palette";
 
@@ -91,14 +91,13 @@ function drawWinEnding(
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.shadowColor = rgba(CYAN, 0.5);
-  ctx.shadowBlur = 26 * scale;
-  ctx.fillStyle = rgba(CYAN, 0.25);
-  ctx.strokeStyle = rgba(CYAN, 0.55);
-  ctx.lineWidth = 1.5 * scale;
-  heartBodyPath(ctx, cx, cy, bodyRadius, t);
-  ctx.fill();
-  ctx.stroke();
+  drawHeartShape(ctx, cx, cy, bodyRadius, t, {
+    fillColor: CYAN,
+    fillAlpha: 0.25,
+    strokeColor: CYAN,
+    strokeAlpha: 0.55,
+    shadowBlur: 26 * scale,
+  });
   ctx.restore();
 
   ctx.save();
@@ -143,14 +142,13 @@ function drawLossEnding(
   if (dimP <= 0) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = rgba(bodyColor, 0.5);
-    ctx.shadowBlur = 26 * scale;
-    ctx.fillStyle = rgba(bodyColor, 0.22);
-    ctx.strokeStyle = rgba(bodyColor, 0.5);
-    ctx.lineWidth = 1.5 * scale;
-    heartBodyPath(ctx, cx, cy, bodyRadius, 0);
-    ctx.fill();
-    ctx.stroke();
+    drawHeartShape(ctx, cx, cy, bodyRadius, 0, {
+      fillColor: bodyColor,
+      fillAlpha: 0.22,
+      strokeColor: bodyColor,
+      strokeAlpha: 0.5,
+      shadowBlur: 26 * scale,
+    });
     ctx.restore();
 
     ctx.save();
@@ -181,10 +179,14 @@ function drawLossEnding(
   if (dimP > 0) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = rgba(MAGENTA, 0.22 * dimP);
-    ctx.lineWidth = 1.5 * scale;
-    heartBodyPath(ctx, cx, cy, bodyRadius, 0);
-    ctx.stroke();
+    drawHeartShape(ctx, cx, cy, bodyRadius, 0, {
+      fillColor: MAGENTA,
+      fillAlpha: 0,
+      strokeColor: MAGENTA,
+      strokeAlpha: 0.22 * dimP,
+      shadowBlur: 0,
+      strokeOnly: true,
+    });
     ctx.restore();
   }
 }
