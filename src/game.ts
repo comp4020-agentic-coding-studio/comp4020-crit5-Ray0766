@@ -222,7 +222,12 @@ export class Game {
   }
 
   private updateWaveSpawner(dt: number): void {
-    if (this.waveNumber >= TOTAL_WAVES && this.enemies.length === 0) return;
+    if (
+      this.waveNumber >= TOTAL_WAVES &&
+      this.waveSpawnedCount >= waveConfig(TOTAL_WAVES).count &&
+      this.enemies.length === 0
+    )
+      return;
 
     const config = waveConfig(Math.max(1, this.waveNumber));
     const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < config.count;
