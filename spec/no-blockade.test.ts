@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPlaceUnit, type CellKind, type PathGrid } from "../src/pathing";
+import { canPlaceUnit, hasOpenPath, type CellKind, type PathGrid } from "../src/pathing";
 
 // Hand-written fixtures: each character is one cell.
 // E = entrance, C = core, # = a pre-existing blocked cell, . = empty.
@@ -36,5 +36,17 @@ describe("the hard rule: a placement can never seal every entrance off from the 
 
     expect(canPlaceUnit(g, 2, 0)).toBe(true);
     expect(canPlaceUnit(g, 0, 2)).toBe(true);
+  });
+});
+
+describe("the same guard also backs a swap: two placed units trading cells", () => {
+  it("would be rejected if the board it left behind sealed every entrance off", () => {
+    // Nothing in real play can leave the board looking like this — the
+    // blocked-cell set only ever grows through validated placements — but a
+    // swap re-runs this exact check against the post-swap board before it's
+    // allowed to land, and this is what it has to catch if it ever did.
+    const g = grid(["E#", "#C"]);
+
+    expect(hasOpenPath(g)).toBe(false);
   });
 });

@@ -61,6 +61,17 @@ export function distanceFromCore(grid: PathGrid, extraBlocked?: number): Int32Ar
 }
 
 /**
+ * True if at least one entrance still has a path to the core, treating
+ * `extraBlocked` (if given) as blocked too. This is the actual guard behind
+ * the hard rule — placement checks it against a candidate cell, and a swap
+ * checks it against the board as it would sit afterwards.
+ */
+export function hasOpenPath(grid: PathGrid, extraBlocked?: number): boolean {
+  const dist = distanceFromCore(grid, extraBlocked);
+  return grid.cells.some((kind, i) => kind === "entrance" && dist[i] !== -1);
+}
+
+/**
  * The hard rule: you can only build on an empty cell, and only if doing so
  * still leaves at least one entrance with a path to the core. A placement
  * that would seal every entrance off is rejected.
@@ -68,6 +79,5 @@ export function distanceFromCore(grid: PathGrid, extraBlocked?: number): Int32Ar
 export function canPlaceUnit(grid: PathGrid, x: number, y: number): boolean {
   const index = cellIndex(grid, x, y);
   if (grid.cells[index] !== "empty") return false;
-  const dist = distanceFromCore(grid, index);
-  return grid.cells.some((kind, i) => kind === "entrance" && dist[i] !== -1);
+  return hasOpenPath(grid, index);
 }
