@@ -45,3 +45,17 @@ dragging merges.
    stayed a real `<h1>`, visually hidden rather than missing.
    [881522d](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/881522d)
    [b950c57](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/b950c57)
+
+4. This one I didn't find by reading code at all --- I found it by actually
+   playing the built game after last round shipped. Starting resource was 30
+   and the very first placement already cost 20, climbing after that, so by
+   the time I'd saved up for a second unit I was several waves in and the
+   pathogens had long since overwhelmed the one cell I had down. Merging,
+   the whole point of the level system, basically never came up in a real
+   playthrough because you never had two units on the board at once to merge.
+   Nothing in the code was wrong in the sense of a bug --- the numbers just
+   didn't work together once I tried to actually win a run. Fixed by moving
+   to flat per-level prices (25/70/140) instead of a cost that keeps growing,
+   and raising the starting resource so a second and third placement are both
+   reachable well before the pathogens pile up.
+   [2b97f19](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/2b97f19)
