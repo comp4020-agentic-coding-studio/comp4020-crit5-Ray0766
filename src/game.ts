@@ -54,11 +54,14 @@ export interface ResourceOrb {
   age: number;
 }
 
+export const ATTACK_FLASH_TTL = 0.1;
+
 export interface AttackFlash {
   fromX: number;
   fromY: number;
   toX: number;
   toY: number;
+  targetId: number;
   ttl: number;
 }
 
@@ -207,6 +210,27 @@ export class Game {
 
   unitAt(x: number, y: number): Unit | undefined {
     return this.units.get(cellIndex(this.grid, x, y));
+  }
+
+  /** Start a fresh run in place, so anything holding onto this Game instance
+   *  (input listeners, the frame loop) doesn't need to be re-wired. */
+  reset(): void {
+    this.grid = { width: GRID_SIZE, height: GRID_SIZE, cells: this.baseCells.slice() };
+    this.distanceField = distanceFromCore(this.grid);
+    this.units.clear();
+    this.scars.clear();
+    this.enemies = [];
+    this.orbs = [];
+    this.flashes = [];
+    this.fx = [];
+    this.resource = START_RESOURCE;
+    this.placeCost = PLACE_COST_BASE;
+    this.coreHp = CORE_MAX_HP;
+    this.status = "playing";
+    this.waveNumber = 0;
+    this.waveSpawnedCount = 0;
+    this.spawnTimer = 0;
+    this.gapTimer = WAVE_GAP_SECONDS;
   }
 
   update(dt: number): void {
@@ -371,7 +395,14 @@ export class Game {
 
       target.hp -= stats.damage;
       unit.cooldown = stats.attackInterval;
-      this.flashes.push({ fromX: ux, fromY: uy, toX: target.x, toY: target.y, ttl: 0.1 });
+      this.flashes.push({
+        fromX: ux,
+        fromY: uy,
+        toX: target.x,
+        toY: target.y,
+        targetId: target.id,
+        ttl: ATTACK_FLASH_TTL,
+      });
     }
   }
 

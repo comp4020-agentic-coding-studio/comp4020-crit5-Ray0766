@@ -1,6 +1,7 @@
 import { Game } from "./src/game";
 import { attachInput } from "./src/input";
 import { draw } from "./src/render";
+import { shouldAutoRestart } from "./src/render/ending";
 
 const canvasEl = document.querySelector<HTMLCanvasElement>("#board");
 if (!canvasEl) throw new Error("missing #board canvas");
@@ -27,6 +28,7 @@ function frame(now: number): void {
   last = now;
   game.update(dt);
   draw(ctx, game, canvas.width, canvas.height);
+  if (shouldAutoRestart(game, now / 1000)) game.reset();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
