@@ -32,8 +32,16 @@ dragging merges.
    to it anymore, so the total obstacle count on the board never drops.
    [911c28b](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/911c28b)
 
-3. Keeping "no explanatory text anywhere" while still giving feedback meant
-   the HUD couldn't use numbers or words at all --- core health, resource and
-   wave progress are bars and pips whose fill is the only signal, and the page's
-   one required heading is a real `<h1>`, visually hidden rather than missing.
-   [d108240](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/d108240)
+3. I first read "no explanatory text anywhere" as "no text of any kind" and
+   built the whole HUD around that stricter rule --- core health, resource and
+   wave progress were bars and pips whose fill was the only signal, no digits
+   anywhere on screen.
+   [8d9c482](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/8d9c482)
+   Coming back to it later I realised a number isn't an explanation --- it's
+   only "how do I play this" text that the rule actually bans, a plain digit
+   reporting a value is fine. So the bars and pips came out in favour of
+   floating damage numbers over whatever just got hit plus a small numeral
+   readout for resource and wave count, and the page's one required heading
+   stayed a real `<h1>`, visually hidden rather than missing.
+   [881522d](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/881522d)
+   [b950c57](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/b950c57)
