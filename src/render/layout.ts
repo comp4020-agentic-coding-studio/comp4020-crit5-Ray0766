@@ -12,21 +12,23 @@ export interface Layout {
   offsetY: number;
   hudTop: number;
   hudBottom: number;
+  hudLeft: number;
   hudRight: number;
 }
 
-// Width of the right-hand cell-selector strip, in cells.
+// Width of the left (score) and right (cell selector) strips, in cells.
 const SIDEBAR_CELLS = 2;
 
 export function computeLayout(width: number, height: number): Layout {
   const hudTop = Math.max(12, height * 0.02);
   const hudBottom = Math.max(10, height * 0.015);
   const usableHeight = Math.max(1, height - hudTop - hudBottom);
-  const cellSize = Math.min(width / (GRID_SIZE + SIDEBAR_CELLS), usableHeight / GRID_SIZE);
+  const cellSize = Math.min(width / (GRID_SIZE + SIDEBAR_CELLS * 2), usableHeight / GRID_SIZE);
+  const hudLeft = cellSize * SIDEBAR_CELLS;
   const hudRight = cellSize * SIDEBAR_CELLS;
-  const offsetX = (width - hudRight - cellSize * GRID_SIZE) / 2;
+  const offsetX = hudLeft + (width - hudLeft - hudRight - cellSize * GRID_SIZE) / 2;
   const offsetY = hudTop + (usableHeight - cellSize * GRID_SIZE) / 2;
-  return { cellSize, offsetX, offsetY, hudTop, hudBottom, hudRight };
+  return { cellSize, offsetX, offsetY, hudTop, hudBottom, hudLeft, hudRight };
 }
 
 export function scaleFor(layout: Layout): number {

@@ -10,6 +10,7 @@ import { CYAN, MAGENTA, rgba } from "./render/palette";
 import { drawPathogens, prunePathogenCache } from "./render/pathogens";
 import { drawGrid } from "./render/grid";
 import { drawHeart } from "./render/heart";
+import { drawScoreSidebar } from "./render/score";
 import { drawSelector } from "./render/selector";
 import { tickShake } from "./render/shake";
 import { drawAttackTrails } from "./render/trails";
@@ -43,6 +44,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawWaveBanner(ctx, game, layout, width, height, t);
   drawNumbers(ctx, game, layout, width, t);
   drawSelector(ctx, game, layout, t);
+  drawScoreSidebar(ctx, game, layout, t);
 
   ctx.restore();
   ctx.globalCompositeOperation = "source-over";

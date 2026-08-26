@@ -73,3 +73,8 @@ export function waveConfig(waveNumber: number): WaveConfig {
 }
 
 export const CORE_CONTACT_DAMAGE = 1;
+
+export const SCORE_KILL = 10;
+export const SCORE_BOSS_KILL = 500;
+export const SCORE_WIN = 1000;
+export const SCORE_PER_REMAINING_CORE_HP = 50;

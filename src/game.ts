@@ -9,6 +9,10 @@ import {
   PLACE_COST_BY_LEVEL,
   RESOURCE_ORB_LIFETIME,
   RESOURCE_PICKUP_RADIUS_CELLS,
+  SCORE_BOSS_KILL,
+  SCORE_KILL,
+  SCORE_PER_REMAINING_CORE_HP,
+  SCORE_WIN,
   SPAWN_INTERVAL_SECONDS,
   START_RESOURCE,
   TOTAL_WAVES,
@@ -108,6 +112,7 @@ export class Game {
   resource = START_RESOURCE;
   coreHp = CORE_MAX_HP;
   status: GameStatus = "playing";
+  score = 0;
 
   waveNumber = 0; // 0 = before the first wave
   waveSpawnedCount = 0;
@@ -226,6 +231,7 @@ export class Game {
     this.resource = START_RESOURCE;
     this.coreHp = CORE_MAX_HP;
     this.status = "playing";
+    this.score = 0;
     this.waveNumber = 0;
     this.waveSpawnedCount = 0;
     this.spawnTimer = 0;
@@ -308,6 +314,7 @@ export class Game {
           value: resourceOrbValue(this.waveNumber),
           age: 0,
         });
+        this.score += enemy.boss ? SCORE_BOSS_KILL : SCORE_KILL;
         this.pushFx(enemy.boss ? "boss-kill" : "kill", enemy.x, enemy.y);
         continue;
       }
@@ -438,7 +445,10 @@ export class Game {
       return;
     }
     if (this.waveNumber >= TOTAL_WAVES && this.waveSpawnedCount >= waveConfig(TOTAL_WAVES).count) {
-      if (this.enemies.length === 0) this.status = "won";
+      if (this.enemies.length === 0 && this.status === "playing") {
+        this.status = "won";
+        this.score += SCORE_WIN + SCORE_PER_REMAINING_CORE_HP * this.coreHp;
+      }
     }
   }
 }
