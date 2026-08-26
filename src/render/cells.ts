@@ -15,8 +15,8 @@ export function drawLeaf(
 ): void {
   const outer = r * 1.8;
   const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, outer);
-  gradient.addColorStop(0, rgba(CYAN, 0.22 * k));
-  gradient.addColorStop(0.6, rgba(CYAN, 0.1 * k));
+  gradient.addColorStop(0, rgba(CYAN, 0.3 * k));
+  gradient.addColorStop(0.6, rgba(CYAN, 0.14 * k));
   gradient.addColorStop(1, rgba(CYAN, 0));
   ctx.fillStyle = gradient;
   ctx.beginPath();
@@ -24,19 +24,20 @@ export function drawLeaf(
   ctx.fill();
 
   ctx.save();
-  ctx.shadowColor = rgba(CYAN, 0.5 * k);
-  ctx.shadowBlur = 8 * scale;
-  ctx.strokeStyle = rgba(CYAN, 0.5 * k);
-  ctx.lineWidth = 1.2 * scale;
+  ctx.shadowColor = rgba(CYAN, 0.65 * k);
+  ctx.shadowBlur = 11 * scale;
+  ctx.strokeStyle = rgba(CYAN, 0.65 * k);
+  ctx.lineWidth = 1.4 * scale;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
   ctx.save();
-  ctx.shadowColor = rgba(CYAN_CORE, 0.95 * k);
-  ctx.shadowBlur = 12 * scale;
-  ctx.fillStyle = rgba(CYAN_CORE, 0.95 * k);
+  const coreAlpha = Math.min(1, 0.95 * k);
+  ctx.shadowColor = rgba(CYAN_CORE, coreAlpha);
+  ctx.shadowBlur = 12 * scale * (0.7 + 0.6 * k);
+  ctx.fillStyle = rgba(CYAN_CORE, coreAlpha);
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.36, 0, Math.PI * 2);
   ctx.fill();
@@ -54,11 +55,11 @@ export function drawMembrane(
 ): void {
   const segments = 22;
   ctx.save();
-  ctx.shadowColor = rgba(CYAN, 0.4);
-  ctx.shadowBlur = 14 * scale;
-  ctx.fillStyle = rgba(CYAN, 0.1);
-  ctx.strokeStyle = rgba(CYAN, 0.4);
-  ctx.lineWidth = 1 * scale;
+  ctx.shadowColor = rgba(CYAN, 0.55);
+  ctx.shadowBlur = 20 * scale;
+  ctx.fillStyle = rgba(CYAN, 0.16);
+  ctx.strokeStyle = rgba(CYAN, 0.55);
+  ctx.lineWidth = 1.3 * scale;
   ctx.beginPath();
   for (let i = 0; i <= segments; i++) {
     const a = (i / segments) * Math.PI * 2;
@@ -103,7 +104,7 @@ export function drawUnits(ctx: CanvasRenderingContext2D, game: Game, layout: Lay
         const a = (i / innerLeafCount) * Math.PI * 2 + seed;
         const lx = cx + Math.cos(a) * orbitRadius;
         const ly = cy + Math.sin(a) * orbitRadius;
-        drawLeaf(ctx, lx, ly, 6.5 * scale * breathe, 0.8, scale);
+        drawLeaf(ctx, lx, ly, 6.5 * scale * breathe, 1.3, scale);
       }
     }
   }

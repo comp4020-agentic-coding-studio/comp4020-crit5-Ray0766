@@ -54,7 +54,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, game: Game, layout: Layo
       if (game.grid.cells[y * GRID_SIZE + x] !== "empty") continue;
 
       const [cx, cy] = cellCenter(layout, x, y);
-      const idleAlpha = 0.045 + 0.018 * Math.sin(1.5 * t + x * 0.05 + y * 0.03);
+      const idleAlpha = 0.008 + 0.006 * Math.sin(1.5 * t + x * 0.05 + y * 0.03);
       let alpha = idleAlpha;
       if (pointer) {
         const dist = Math.hypot(cx - pointer.px, cy - pointer.py);
