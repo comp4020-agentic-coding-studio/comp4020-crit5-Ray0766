@@ -125,6 +125,7 @@ export class Game {
 
   private nextEnemyId = 1;
   private nextOrbId = 1;
+  private rand: () => number = Math.random;
 
   private rebuildGrid(): void {
     const cells = this.baseCells.slice();
@@ -221,6 +222,31 @@ export class Game {
     return this.units.get(cellIndex(this.grid, x, y));
   }
 
+  /** Debug-only: makes entrance-choice reproducible, for repeatable screenshots.
+   *  Only ever called from main.ts, and only when the URL asks for it. */
+  setSeed(seed: number): void {
+    let a = seed | 0;
+    this.rand = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** Debug-only: skip straight to a given wave so the wave-8 boss can be
+   *  reached for a screenshot without sitting through the first seven.
+   *  Only ever called from main.ts, and only when the URL asks for it. */
+  debugJumpToWave(waveNumber: number): void {
+    const target = Math.max(1, Math.min(TOTAL_WAVES, Math.floor(waveNumber)));
+    this.waveNumber = target;
+    this.waveSpawnedCount = 0;
+    this.spawnTimer = 0;
+    this.gapTimer = WAVE_GAP_SECONDS;
+    this.enemies = [];
+    this.resource += 400; // enough to throw a few units down before it arrives
+  }
+
   /** Start a fresh run in place, so anything holding onto this Game instance
    *  (input listeners, the frame loop) doesn't need to be re-wired. */
   reset(): void {
@@ -294,7 +320,7 @@ export class Game {
     // The boss only ever comes through a major vessel; everything else picks
     // from the full set, and lands elite if that roll happens to be major.
     const pool = config.boss ? MAJOR_ENTRANCES : ENTRANCES;
-    const [ex, ey] = pool[Math.floor(Math.random() * pool.length)];
+    const [ex, ey] = pool[Math.floor(this.rand() * pool.length)];
     const elite = !config.boss && entranceTier(ex, ey) === "major";
     const hp = elite ? Math.round(config.hp * ELITE_HP_MULTIPLIER) : config.hp;
     this.enemies.push({
