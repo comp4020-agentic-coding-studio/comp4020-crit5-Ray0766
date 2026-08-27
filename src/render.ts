@@ -6,6 +6,7 @@ import { drawCombo } from "./render/combo";
 import { drawCoreFlash } from "./render/coreflash";
 import { drawFx } from "./render/fx";
 import { drawHearts } from "./render/hearts";
+import { drawWaveIntel } from "./render/intel";
 import { computeLayout, type Layout } from "./render/layout";
 import { drawNumbers } from "./render/numbers";
 import { drawOrbs } from "./render/orbs";
@@ -37,6 +38,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawVesselParticles(ctx, layout, t, vessels);
   drawGrid(ctx, game, layout, t);
   drawOrbs(ctx, game, layout, t);
+  drawWaveIntel(ctx, game, layout, vessels, t);
   drawPathogens(ctx, game, layout, t);
   prunePathogenCache(game);
   drawUnits(ctx, game, layout, t);

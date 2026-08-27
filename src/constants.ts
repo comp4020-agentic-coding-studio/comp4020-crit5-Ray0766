@@ -36,8 +36,14 @@ export function entranceTier(x: number, y: number): EntranceTier {
 export const MAJOR_VESSEL_WIDTH_CELLS = 1.6;
 export const MINOR_VESSEL_WIDTH_CELLS = 0.7;
 
-export const ELITE_HP_MULTIPLIER = 2.2;
-export const ELITE_RADIUS_MULTIPLIER = 1.4;
+export const ELITE_HP_MULTIPLIER = 4;
+export const ELITE_RADIUS_MULTIPLIER = 1.6;
+export const ELITE_SPEED_MULTIPLIER = 0.6;
+
+export const FAST_SIZE_MULTIPLIER = 0.75;
+export const FAST_SPEED_MULTIPLIER = 1.8;
+export const FAST_HP_MULTIPLIER = 0.5;
+export const FAST_SPAWN_CHANCE = 0.35;
 
 export const CORE_MAX_HP = 12;
 export const START_RESOURCE = 120;

@@ -5,7 +5,11 @@ import {
   CORE_Y,
   EARLY_CALL_RESOURCE_PER_SECOND,
   ELITE_HP_MULTIPLIER,
+  ELITE_SPEED_MULTIPLIER,
   ENTRANCES,
+  FAST_HP_MULTIPLIER,
+  FAST_SPAWN_CHANCE,
+  FAST_SPEED_MULTIPLIER,
   GRID_SIZE,
   MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
@@ -52,6 +56,17 @@ export interface Enemy {
   speed: number; // cells per second
   boss?: boolean;
   elite?: boolean;
+  fast?: boolean;
+}
+
+// A whole wave's entrance/tier assignments, rolled up front so wave intel
+// can show the truth instead of a statistical guess.
+export interface SpawnPlan {
+  ex: number;
+  ey: number;
+  elite: boolean;
+  fast: boolean;
+  boss: boolean;
 }
 
 export interface ResourceOrb {
@@ -124,9 +139,11 @@ export class Game {
   waveSpawnedCount = 0;
   spawnTimer = 0;
   prepTimer = PREP_SECONDS;
+  upcomingPlan: SpawnPlan[] = [];
 
   private nextEnemyId = 1;
   private nextOrbId = 1;
+  private planWaveNumber = 0;
   private rand: () => number = Math.random;
 
   private rebuildGrid(): void {
@@ -292,6 +309,7 @@ export class Game {
 
     const config = waveConfig(Math.max(1, this.waveNumber));
     const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < config.count;
+    this.ensurePlanFor(waveInProgress ? this.waveNumber : this.waveNumber + 1);
 
     if (waveInProgress) {
       this.spawnTimer -= dt;
@@ -314,6 +332,28 @@ export class Game {
     this.waveSpawnedCount = 0;
     this.spawnTimer = 0;
     this.prepTimer = PREP_SECONDS;
+  }
+
+  /** Regenerates `upcomingPlan` only when it's stale for the requested wave
+   *  — a cheap no-op on the common per-tick call. debugJumpToWave/reset need
+   *  no special casing: the next tick notices the mismatch and regenerates. */
+  private ensurePlanFor(waveNumber: number): void {
+    if (this.planWaveNumber === waveNumber) return;
+    this.planWaveNumber = waveNumber;
+    this.upcomingPlan = this.generateWavePlan(waveNumber);
+  }
+
+  private generateWavePlan(waveNumber: number): SpawnPlan[] {
+    const config = waveConfig(Math.max(1, waveNumber));
+    const pool = config.boss ? MAJOR_ENTRANCES : ENTRANCES;
+    const plan: SpawnPlan[] = [];
+    for (let i = 0; i < config.count; i++) {
+      const [ex, ey] = pool[Math.floor(this.rand() * pool.length)];
+      const elite = !config.boss && entranceTier(ex, ey) === "major";
+      const fast = !config.boss && !elite && this.rand() < FAST_SPAWN_CHANCE;
+      plan.push({ ex, ey, elite, fast, boss: Boolean(config.boss) });
+    }
+    return plan;
   }
 
   /** True between waves — before the first one, or once the current one is
@@ -339,12 +379,17 @@ export class Game {
   }
 
   private spawnEnemy(config: ReturnType<typeof waveConfig>): void {
-    // The boss only ever comes through a major vessel; everything else picks
-    // from the full set, and lands elite if that roll happens to be major.
-    const pool = config.boss ? MAJOR_ENTRANCES : ENTRANCES;
-    const [ex, ey] = pool[Math.floor(this.rand() * pool.length)];
-    const elite = !config.boss && entranceTier(ex, ey) === "major";
-    const hp = elite ? Math.round(config.hp * ELITE_HP_MULTIPLIER) : config.hp;
+    const { ex, ey, elite, fast, boss } = this.upcomingPlan[this.waveSpawnedCount];
+    const hp = elite
+      ? Math.round(config.hp * ELITE_HP_MULTIPLIER)
+      : fast
+        ? Math.round(config.hp * FAST_HP_MULTIPLIER)
+        : config.hp;
+    const speed = elite
+      ? config.speedCellsPerSecond * ELITE_SPEED_MULTIPLIER
+      : fast
+        ? config.speedCellsPerSecond * FAST_SPEED_MULTIPLIER
+        : config.speedCellsPerSecond;
     this.enemies.push({
       id: this.nextEnemyId++,
       x: ex,
@@ -353,11 +398,12 @@ export class Game {
       targetY: ey,
       hp,
       maxHp: hp,
-      speed: config.speedCellsPerSecond,
-      boss: config.boss,
+      speed,
+      boss,
       elite,
+      fast,
     });
-    if (config.boss) this.pushFx("boss-spawn", ex, ey);
+    if (boss) this.pushFx("boss-spawn", ex, ey);
   }
 
   private updateEnemies(dt: number): void {
