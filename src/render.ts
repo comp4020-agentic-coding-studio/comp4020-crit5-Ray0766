@@ -7,6 +7,7 @@ import { computeLayout, type Layout } from "./render/layout";
 import { drawNumbers } from "./render/numbers";
 import { drawOrbs } from "./render/orbs";
 import { drawPathogens, prunePathogenCache } from "./render/pathogens";
+import { drawPathLength } from "./render/pathlen";
 import { drawEnding } from "./render/ending";
 import { drawGrid } from "./render/grid";
 import { drawHeart } from "./render/heart";
@@ -40,6 +41,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawHeart(ctx, game, layout, t);
   drawFx(ctx, game, layout, t);
   drawCoreFlash(ctx, game, width, height, t);
+  drawPathLength(ctx, game, layout, t);
   drawWaveBanner(ctx, game, layout, width, height, t);
   drawNumbers(ctx, game, layout, width, t);
   drawSelector(ctx, game, layout, t);
