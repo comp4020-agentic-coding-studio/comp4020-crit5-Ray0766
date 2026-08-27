@@ -1,8 +1,10 @@
 import type { Game } from "./game";
 import { drawUnits } from "./render/cells";
 import { drawWaveBanner } from "./render/banner";
+import { drawCombo } from "./render/combo";
 import { drawCoreFlash } from "./render/coreflash";
 import { drawFx } from "./render/fx";
+import { drawHearts } from "./render/hearts";
 import { computeLayout, type Layout } from "./render/layout";
 import { drawNumbers } from "./render/numbers";
 import { drawOrbs } from "./render/orbs";
@@ -46,6 +48,8 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawNumbers(ctx, game, layout, width, t);
   drawSelector(ctx, game, layout, t);
   drawScoreSidebar(ctx, game, layout, t);
+  drawHearts(ctx, game, layout, t);
+  drawCombo(ctx, game, layout, width, height, t);
 
   ctx.restore();
   ctx.globalCompositeOperation = "source-over";

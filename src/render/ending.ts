@@ -9,13 +9,95 @@ import { playEnding } from "../audio";
 import { drawHeartShape } from "./heart";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { CYAN, CYAN_CORE, MAGENTA, MAGENTA_CORE, mix, rgba } from "./palette";
+import { getHighScore } from "./score";
 
+const FONT_STACK = '"IBM Plex Mono", ui-monospace, monospace';
 const WIN_EXPAND_DURATION = 1.2; // spec: glow covers the screen in 1.2s
 const WIN_RETRACT_DURATION = 0.6;
 const LOSS_COLOR_SHIFT_DURATION = 0.5;
 const LOSS_RING_EXPAND_DURATION = 1;
 const LOSS_DIM_DURATION = 0.8;
 const RESTART_HOLD_SECONDS = 3; // spec: restart 3s after the ending finishes
+
+const STAR_STAGGER = 0.15;
+const STAR_ANIM_DURATION = 0.4;
+const STAR_COUNT = 3;
+
+/** coreHp is 1..CORE_MAX_HP (12) here — win is only reachable with hp >= 1. */
+function starsEarned(coreHp: number): number {
+  if (coreHp >= 12) return 3;
+  if (coreHp >= 7) return 2;
+  return 1;
+}
+
+function traceStar(ctx: CanvasRenderingContext2D, outerRadius: number): void {
+  const innerRadius = outerRadius * 0.382;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outerRadius : innerRadius;
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function drawStars(
+  ctx: CanvasRenderingContext2D,
+  scale: number,
+  cx: number,
+  cy: number,
+  earned: number,
+  elapsed: number,
+): void {
+  const spacing = 46 * scale;
+  const y = cy + 96 * scale;
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const localElapsed = elapsed - WIN_EXPAND_DURATION - i * STAR_STAGGER;
+    if (localElapsed < 0) continue;
+    const p = easeOutCubic(Math.min(1, localElapsed / STAR_ANIM_DURATION));
+    const rotation = (-40 * (1 - p) * Math.PI) / 180;
+    const x = cx + (i - 1) * spacing;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.scale(Math.max(0.001, p), Math.max(0.001, p));
+    traceStar(ctx, 16 * scale);
+    if (i < earned) {
+      ctx.fillStyle = rgba(CYAN_CORE, 0.9);
+      ctx.fill();
+      ctx.strokeStyle = rgba(CYAN_CORE, 0.9);
+    } else {
+      ctx.strokeStyle = rgba(CYAN, 0.35);
+    }
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawFinalScore(
+  ctx: CanvasRenderingContext2D,
+  scale: number,
+  cx: number,
+  cy: number,
+  score: number,
+): void {
+  const y = cy + 140 * scale;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${20 * scale}px ${FONT_STACK}`;
+  ctx.fillStyle = rgba(CYAN_CORE, 0.9);
+  ctx.fillText(String(score), cx, y);
+  ctx.font = `${11 * scale}px ${FONT_STACK}`;
+  ctx.fillStyle = rgba(CYAN_CORE, 0.45);
+  ctx.fillText(String(getHighScore()), cx, y + 24 * scale);
+  ctx.restore();
+}
 
 let lastStatus: GameStatus = "playing";
 let statusSince = -Infinity;
@@ -43,6 +125,7 @@ function fullScreenRadius(width: number, height: number): number {
 
 function drawWinEnding(
   ctx: CanvasRenderingContext2D,
+  game: Game,
   layout: Layout,
   width: number,
   height: number,
@@ -110,6 +193,11 @@ function drawWinEnding(
   ctx.arc(cx, cy, 17 * s * scale, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  if (elapsed >= WIN_EXPAND_DURATION) {
+    drawStars(ctx, scale, cx, cy, starsEarned(game.coreHp), elapsed);
+    drawFinalScore(ctx, scale, cx, cy, game.score);
+  }
 }
 
 function drawLossEnding(
@@ -202,7 +290,7 @@ export function drawEnding(
   ingestStatus(game, t);
   if (game.status === "playing") return;
   const elapsed = t - statusSince;
-  if (game.status === "won") drawWinEnding(ctx, layout, width, height, t, elapsed);
+  if (game.status === "won") drawWinEnding(ctx, game, layout, width, height, t, elapsed);
   else drawLossEnding(ctx, layout, width, height, t, elapsed);
 }
 

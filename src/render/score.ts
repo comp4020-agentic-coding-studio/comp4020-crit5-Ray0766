@@ -27,6 +27,10 @@ function saveHighScore(value: number): void {
 let highScore = loadHighScore();
 let lastScore = 0;
 
+export function getHighScore(): number {
+  return highScore;
+}
+
 interface ScorePopup {
   value: number;
   startedAt: number;
@@ -64,8 +68,8 @@ export function drawScoreSidebar(
   ctx.fillStyle = rgba(CYAN_CORE, 0.9);
   ctx.fillText(String(game.score), cx, scoreY);
 
-  ctx.font = `${13 * scale}px ${FONT_STACK}`;
-  ctx.fillStyle = rgba(CYAN_CORE, 0.3);
+  ctx.font = `${11 * scale}px ${FONT_STACK}`;
+  ctx.fillStyle = rgba(CYAN_CORE, 0.45);
   ctx.fillText(String(highScore), cx, highY);
 
   ctx.font = `${13 * scale}px ${FONT_STACK}`;

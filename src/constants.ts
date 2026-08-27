@@ -39,7 +39,7 @@ export const MINOR_VESSEL_WIDTH_CELLS = 0.7;
 export const ELITE_HP_MULTIPLIER = 2.2;
 export const ELITE_RADIUS_MULTIPLIER = 1.4;
 
-export const CORE_MAX_HP = 20;
+export const CORE_MAX_HP = 12;
 export const START_RESOURCE = 120;
 
 // Flat price per unit level, however it's reached. Merging (and the position
@@ -105,6 +105,7 @@ export function waveConfig(waveNumber: number): WaveConfig {
 export const CORE_CONTACT_DAMAGE = 1;
 
 export const SCORE_KILL = 10;
+export const SCORE_ELITE_KILL = 50;
 export const SCORE_BOSS_KILL = 500;
 export const SCORE_WIN = 1000;
 export const SCORE_PER_REMAINING_CORE_HP = 50;

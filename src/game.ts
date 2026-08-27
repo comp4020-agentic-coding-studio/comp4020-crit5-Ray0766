@@ -12,6 +12,7 @@ import {
   RESOURCE_ORB_LIFETIME,
   RESOURCE_PICKUP_RADIUS_CELLS,
   SCORE_BOSS_KILL,
+  SCORE_ELITE_KILL,
   SCORE_KILL,
   SCORE_PER_REMAINING_CORE_HP,
   SCORE_WIN,
@@ -350,7 +351,7 @@ export class Game {
           value: resourceOrbValue(this.waveNumber),
           age: 0,
         });
-        this.score += enemy.boss ? SCORE_BOSS_KILL : SCORE_KILL;
+        this.score += enemy.boss ? SCORE_BOSS_KILL : enemy.elite ? SCORE_ELITE_KILL : SCORE_KILL;
         this.pushFx(enemy.boss ? "boss-kill" : "kill", enemy.x, enemy.y);
         continue;
       }
