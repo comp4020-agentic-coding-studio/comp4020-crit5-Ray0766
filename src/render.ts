@@ -1,6 +1,7 @@
 import type { Game } from "./game";
 import { drawUnits } from "./render/cells";
 import { drawWaveBanner } from "./render/banner";
+import { drawCallDot } from "./render/calldot";
 import { drawCombo } from "./render/combo";
 import { drawCoreFlash } from "./render/coreflash";
 import { drawFx } from "./render/fx";
@@ -44,6 +45,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawFx(ctx, game, layout, t);
   drawCoreFlash(ctx, game, width, height, t);
   drawPathLength(ctx, game, layout, t);
+  drawCallDot(ctx, game, layout, t);
   drawWaveBanner(ctx, game, layout, width, height, t);
   drawNumbers(ctx, game, layout, width, t);
   drawSelector(ctx, game, layout, t);

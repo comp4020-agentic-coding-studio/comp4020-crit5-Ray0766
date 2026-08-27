@@ -59,7 +59,8 @@ export const RESOURCE_ORB_LIFETIME = 6; // seconds
 export const RESOURCE_PICKUP_RADIUS_CELLS = 0.6;
 
 export const TOTAL_WAVES = 8;
-export const WAVE_GAP_SECONDS = 2.5;
+export const PREP_SECONDS = 20;
+export const EARLY_CALL_RESOURCE_PER_SECOND = 3;
 export const SPAWN_INTERVAL_SECONDS = 0.7;
 
 export interface UnitStats {

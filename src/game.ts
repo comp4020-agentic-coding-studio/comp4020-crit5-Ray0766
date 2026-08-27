@@ -3,12 +3,14 @@ import {
   CORE_MAX_HP,
   CORE_X,
   CORE_Y,
+  EARLY_CALL_RESOURCE_PER_SECOND,
   ELITE_HP_MULTIPLIER,
   ENTRANCES,
   GRID_SIZE,
   MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
   PLACE_COST_BY_LEVEL,
+  PREP_SECONDS,
   RESOURCE_ORB_LIFETIME,
   RESOURCE_PICKUP_RADIUS_CELLS,
   SCORE_BOSS_KILL,
@@ -20,7 +22,6 @@ import {
   START_RESOURCE,
   TOTAL_WAVES,
   UNIT_LEVELS,
-  WAVE_GAP_SECONDS,
   entranceTier,
   resourceOrbValue,
   waveConfig,
@@ -122,7 +123,7 @@ export class Game {
   waveNumber = 0; // 0 = before the first wave
   waveSpawnedCount = 0;
   spawnTimer = 0;
-  gapTimer = WAVE_GAP_SECONDS;
+  prepTimer = PREP_SECONDS;
 
   private nextEnemyId = 1;
   private nextOrbId = 1;
@@ -243,7 +244,7 @@ export class Game {
     this.waveNumber = target;
     this.waveSpawnedCount = 0;
     this.spawnTimer = 0;
-    this.gapTimer = WAVE_GAP_SECONDS;
+    this.prepTimer = PREP_SECONDS;
     this.enemies = [];
     this.resource += 400; // enough to throw a few units down before it arrives
   }
@@ -266,7 +267,7 @@ export class Game {
     this.waveNumber = 0;
     this.waveSpawnedCount = 0;
     this.spawnTimer = 0;
-    this.gapTimer = WAVE_GAP_SECONDS;
+    this.prepTimer = PREP_SECONDS;
   }
 
   update(dt: number): void {
@@ -302,19 +303,39 @@ export class Game {
       return;
     }
 
+    if (this.inPrep) {
+      this.prepTimer -= dt;
+      if (this.prepTimer <= 0) this.startNextWave();
+    }
+  }
+
+  private startNextWave(): void {
+    this.waveNumber += 1;
+    this.waveSpawnedCount = 0;
+    this.spawnTimer = 0;
+    this.prepTimer = PREP_SECONDS;
+  }
+
+  /** True between waves — before the first one, or once the current one is
+   *  fully spawned and cleared — the window callWaveEarly can act in. */
+  get inPrep(): boolean {
+    if (this.status !== "playing" || this.waveNumber >= TOTAL_WAVES) return false;
+    const config = waveConfig(Math.max(1, this.waveNumber));
+    const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < config.count;
+    if (waveInProgress) return false;
     const waveFullyCleared =
       this.waveNumber >= 1 && this.waveSpawnedCount >= config.count && this.enemies.length === 0;
     const beforeFirstWave = this.waveNumber === 0;
+    return beforeFirstWave || waveFullyCleared;
+  }
 
-    if (beforeFirstWave || waveFullyCleared) {
-      this.gapTimer -= dt;
-      if (this.gapTimer <= 0 && this.waveNumber < TOTAL_WAVES) {
-        this.waveNumber += 1;
-        this.waveSpawnedCount = 0;
-        this.spawnTimer = 0;
-        this.gapTimer = WAVE_GAP_SECONDS;
-      }
-    }
+  /** Cash in the rest of the prep window early: resources scaled by the
+   *  seconds skipped, and the next wave starts immediately. */
+  callWaveEarly(): boolean {
+    if (!this.inPrep) return false;
+    this.resource += Math.ceil(this.prepTimer) * EARLY_CALL_RESOURCE_PER_SECOND;
+    this.startNextWave();
+    return true;
   }
 
   private spawnEnemy(config: ReturnType<typeof waveConfig>): void {

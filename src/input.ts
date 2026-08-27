@@ -3,6 +3,7 @@ import { unlockAudio } from "./audio";
 import type { Game } from "./game";
 import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
+import { callDotHitTest } from "./render/calldot";
 import { getSelectedLevel, selectorHitTest, setSelectedLevel } from "./render/selector";
 
 const DRAG_THRESHOLD_PX = 8;
@@ -46,6 +47,10 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
     const sidebarLevel = selectorHitTest(layout, px, py);
     if (sidebarLevel !== -1) {
       setSelectedLevel(sidebarLevel);
+      return;
+    }
+    if (callDotHitTest(game, layout, px, py)) {
+      game.callWaveEarly();
       return;
     }
     const { gx, gy } = toGridCoords(px, py, layout);
