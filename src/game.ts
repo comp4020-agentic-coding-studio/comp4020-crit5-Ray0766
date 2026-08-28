@@ -1,34 +1,35 @@
 import {
+  BASE_ENEMY_SPEED_CELLS_PER_SECOND,
+  BLOCKER_MINION_ATTACK_INTERVAL,
+  BOSS_SUMMON_COUNT,
+  BOSS_SUMMON_INTERVAL_SECONDS,
   CORE_CONTACT_DAMAGE,
   CORE_MAX_HP,
   CORE_X,
   CORE_Y,
   EARLY_CALL_RESOURCE_PER_SECOND,
-  ELITE_HP_MULTIPLIER,
-  ELITE_SPEED_MULTIPLIER,
+  ENEMY_TIERS,
   ENTRANCES,
-  FAST_HP_MULTIPLIER,
-  FAST_SPAWN_CHANCE,
-  FAST_SPEED_MULTIPLIER,
   GRID_SIZE,
   MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
-  PLACE_COST_BY_LEVEL,
+  MINION_INCOMING_DAMAGE_PER_HIT,
   PREP_SECONDS,
+  RESOURCE_DROP_BY_TIER,
   RESOURCE_ORB_LIFETIME,
   RESOURCE_PICKUP_RADIUS_CELLS,
-  SCORE_BOSS_KILL,
-  SCORE_ELITE_KILL,
-  SCORE_KILL,
   SCORE_PER_REMAINING_CORE_HP,
   SCORE_WIN,
   SPAWN_INTERVAL_SECONDS,
   START_RESOURCE,
   TOTAL_WAVES,
-  UNIT_LEVELS,
-  entranceTier,
-  resourceOrbValue,
-  waveConfig,
+  UNIT_KINDS,
+  WAVE_TABLE,
+  scoreForTier,
+  waveHpMultiplier,
+  waveTotalCount,
+  type EnemyTier,
+  type UnitKind,
 } from "./constants";
 import {
   canPlaceUnit,
@@ -40,9 +41,20 @@ import {
   type PathGrid,
 } from "./pathing";
 
+export interface Minion {
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  respawnTimer: number; // counts down while dead; meaningless while alive
+  targetId: number | null;
+  cooldown: number;
+}
+
 export interface Unit {
+  kind: UnitKind;
   level: number; // 1..MAX_UNIT_LEVEL
   cooldown: number;
+  minions?: Minion[]; // only set for kind === "blocker"
 }
 
 export interface Enemy {
@@ -54,9 +66,9 @@ export interface Enemy {
   hp: number;
   maxHp: number;
   speed: number; // cells per second
-  boss?: boolean;
-  elite?: boolean;
-  fast?: boolean;
+  tier: EnemyTier;
+  flying?: boolean; // true = ignores the grid entirely, flies straight to the core
+  summonCooldown?: number; // boss only
 }
 
 // A whole wave's entrance/tier assignments, rolled up front so wave intel
@@ -64,9 +76,7 @@ export interface Enemy {
 export interface SpawnPlan {
   ex: number;
   ey: number;
-  elite: boolean;
-  fast: boolean;
-  boss: boolean;
+  tier: EnemyTier;
 }
 
 export interface ResourceOrb {
@@ -158,32 +168,45 @@ export class Game {
     this.fx.push({ kind, x, y, ttl: 0.15 });
   }
 
-  /** Attempt to place a fresh unit of the given level on an empty cell.
-   *  Price is flat per level; a click with nothing to spend just pings
-   *  "place-denied" instead of placing. Goes through the same blockade
-   *  check regardless of level, so a level-3 placement can't seal off the
-   *  core any more than a level-1 one could. */
-  tryPlaceUnit(x: number, y: number, level = 1): boolean {
+  /** Attempt to place a fresh unit of the given kind on an empty cell, at
+   *  level 1 — level 2/3 only ever come from fusion. Price is flat per kind;
+   *  a click with nothing to spend just pings "place-denied" instead of
+   *  placing. Goes through the same blockade check regardless of kind, so
+   *  the priciest cell can't seal off the core any more than the cheapest
+   *  one could. */
+  tryPlaceUnit(x: number, y: number, kind: UnitKind): boolean {
     if (this.status !== "playing") return false;
-    if (level < 1 || level > MAX_UNIT_LEVEL) return false;
     if (!canPlaceUnit(this.grid, x, y)) return false;
-    const cost = PLACE_COST_BY_LEVEL[level - 1];
-    if (this.resource < cost) {
+    const stats = UNIT_KINDS[kind];
+    if (this.resource < stats.cost) {
       this.pushFx("place-denied", x, y);
       return false;
     }
     const index = cellIndex(this.grid, x, y);
-    this.units.set(index, { level, cooldown: 0 });
-    this.resource -= cost;
+    const unit: Unit = { kind, level: 1, cooldown: 0 };
+    if (kind === "blocker") {
+      const maxHp = stats.minionHpByLevel![0];
+      unit.minions = Array.from({ length: stats.minionCount! }, () => ({
+        hp: maxHp,
+        maxHp,
+        alive: true,
+        respawnTimer: 0,
+        targetId: null,
+        cooldown: 0,
+      }));
+    }
+    this.units.set(index, unit);
+    this.resource -= stats.cost;
     this.rebuildGrid();
     this.pushFx("place", x, y);
     return true;
   }
 
-  /** Drag a placed unit onto another placed unit. Same level: they fuse, the
-   *  source is consumed and its cell stays blocked for good. Different
-   *  levels: they just swap places instead, for free — unless the swap would
-   *  leave every entrance sealed off, in which case it's reverted. */
+  /** Drag a placed unit onto another placed unit. Same kind and same level:
+   *  they fuse, the source is consumed and its cell stays blocked for good.
+   *  Anything else — different kind, or same kind but different level — just
+   *  swaps places instead, for free, unless the swap would leave every
+   *  entrance sealed off, in which case it's reverted. */
   tryMergeUnit(fromIndex: number, toIndex: number): boolean {
     if (this.status !== "playing") return false;
     if (fromIndex === toIndex) return false;
@@ -191,12 +214,21 @@ export class Game {
     const target = this.units.get(toIndex);
     if (!source || !target) return false;
 
-    if (source.level === target.level) {
+    if (source.kind === target.kind && source.level === target.level) {
       if (target.level >= MAX_UNIT_LEVEL) return false;
       this.units.delete(fromIndex);
       this.scars.add(fromIndex);
       target.level += 1;
       target.cooldown = 0;
+      if (target.kind === "blocker" && target.minions) {
+        const maxHp = UNIT_KINDS.blocker.minionHpByLevel![target.level - 1];
+        for (const minion of target.minions) {
+          minion.maxHp = maxHp;
+          minion.hp = maxHp;
+          minion.alive = true;
+          minion.respawnTimer = 0;
+        }
+      }
       this.rebuildGrid();
       const [tx, ty] = cellXY(this.grid, toIndex);
       this.pushFx("merge", tx, ty);
@@ -302,19 +334,19 @@ export class Game {
   private updateWaveSpawner(dt: number): void {
     if (
       this.waveNumber >= TOTAL_WAVES &&
-      this.waveSpawnedCount >= waveConfig(TOTAL_WAVES).count &&
+      this.waveSpawnedCount >= waveTotalCount(TOTAL_WAVES) &&
       this.enemies.length === 0
     )
       return;
 
-    const config = waveConfig(Math.max(1, this.waveNumber));
-    const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < config.count;
+    const total = waveTotalCount(Math.max(1, this.waveNumber));
+    const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < total;
     this.ensurePlanFor(waveInProgress ? this.waveNumber : this.waveNumber + 1);
 
     if (waveInProgress) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        this.spawnEnemy(config);
+        this.spawnEnemy();
         this.waveSpawnedCount += 1;
         this.spawnTimer = SPAWN_INTERVAL_SECONDS;
       }
@@ -343,28 +375,35 @@ export class Game {
     this.upcomingPlan = this.generateWavePlan(waveNumber);
   }
 
+  /** Builds one wave's spawn order from the fixed WAVE_TABLE. Each tier
+   *  group is spread across the wave proportionally — item i of an n-count
+   *  group lands at fraction (i+0.5)/n — then every group is merged by that
+   *  fraction, so types interleave instead of spawning in same-tier clumps. */
   private generateWavePlan(waveNumber: number): SpawnPlan[] {
-    const config = waveConfig(Math.max(1, waveNumber));
-    const pool = config.boss ? MAJOR_ENTRANCES : ENTRANCES;
-    const plan: SpawnPlan[] = [];
-    for (let i = 0; i < config.count; i++) {
-      const [ex, ey] = pool[Math.floor(this.rand() * pool.length)];
-      const elite = !config.boss && entranceTier(ex, ey) === "major";
-      const fast = !config.boss && !elite && this.rand() < FAST_SPAWN_CHANCE;
-      plan.push({ ex, ey, elite, fast, boss: Boolean(config.boss) });
+    const rows = WAVE_TABLE[Math.min(TOTAL_WAVES, Math.max(1, waveNumber))];
+    const slots: Array<{ frac: number; tier: EnemyTier }> = [];
+    for (const row of rows) {
+      for (let i = 0; i < row.count; i++) {
+        slots.push({ frac: (i + 0.5) / row.count, tier: row.tier });
+      }
     }
-    return plan;
+    slots.sort((a, b) => a.frac - b.frac);
+    return slots.map(({ tier }) => {
+      const pool = ENEMY_TIERS[tier].majorOnly ? MAJOR_ENTRANCES : ENTRANCES;
+      const [ex, ey] = pool[Math.floor(this.rand() * pool.length)];
+      return { ex, ey, tier };
+    });
   }
 
   /** True between waves — before the first one, or once the current one is
    *  fully spawned and cleared — the window callWaveEarly can act in. */
   get inPrep(): boolean {
     if (this.status !== "playing" || this.waveNumber >= TOTAL_WAVES) return false;
-    const config = waveConfig(Math.max(1, this.waveNumber));
-    const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < config.count;
+    const total = waveTotalCount(Math.max(1, this.waveNumber));
+    const waveInProgress = this.waveNumber >= 1 && this.waveSpawnedCount < total;
     if (waveInProgress) return false;
     const waveFullyCleared =
-      this.waveNumber >= 1 && this.waveSpawnedCount >= config.count && this.enemies.length === 0;
+      this.waveNumber >= 1 && this.waveSpawnedCount >= total && this.enemies.length === 0;
     const beforeFirstWave = this.waveNumber === 0;
     return beforeFirstWave || waveFullyCleared;
   }
@@ -378,19 +417,12 @@ export class Game {
     return true;
   }
 
-  private spawnEnemy(config: ReturnType<typeof waveConfig>): void {
-    const { ex, ey, elite, fast, boss } = this.upcomingPlan[this.waveSpawnedCount];
-    const hp = elite
-      ? Math.round(config.hp * ELITE_HP_MULTIPLIER)
-      : fast
-        ? Math.round(config.hp * FAST_HP_MULTIPLIER)
-        : config.hp;
-    const speed = elite
-      ? config.speedCellsPerSecond * ELITE_SPEED_MULTIPLIER
-      : fast
-        ? config.speedCellsPerSecond * FAST_SPEED_MULTIPLIER
-        : config.speedCellsPerSecond;
-    this.enemies.push({
+  private spawnEnemy(): void {
+    const { ex, ey, tier } = this.upcomingPlan[this.waveSpawnedCount];
+    const tierStats = ENEMY_TIERS[tier];
+    const hp = Math.round(tierStats.baseHp * waveHpMultiplier(this.waveNumber));
+    const speed = BASE_ENEMY_SPEED_CELLS_PER_SECOND * tierStats.speedMultiplier;
+    const enemy: Enemy = {
       id: this.nextEnemyId++,
       x: ex,
       y: ey,
@@ -399,32 +431,62 @@ export class Game {
       hp,
       maxHp: hp,
       speed,
-      boss,
-      elite,
-      fast,
-    });
-    if (boss) this.pushFx("boss-spawn", ex, ey);
+      tier,
+      flying: tierStats.flying === true,
+    };
+    if (tier === "boss") {
+      enemy.summonCooldown = BOSS_SUMMON_INTERVAL_SECONDS;
+      this.pushFx("boss-spawn", ex, ey);
+    }
+    this.enemies.push(enemy);
   }
 
   private updateEnemies(dt: number): void {
     const survivors: Enemy[] = [];
+    const summoned: Enemy[] = [];
+
     for (const enemy of this.enemies) {
       this.stepEnemy(enemy, dt);
+
+      if (enemy.summonCooldown !== undefined) {
+        enemy.summonCooldown -= dt;
+        if (enemy.summonCooldown <= 0) {
+          enemy.summonCooldown = BOSS_SUMMON_INTERVAL_SECONDS;
+          const normalStats = ENEMY_TIERS.normal;
+          const summonHp = Math.round(normalStats.baseHp * waveHpMultiplier(this.waveNumber));
+          const sx = Math.round(enemy.x);
+          const sy = Math.round(enemy.y);
+          for (let i = 0; i < BOSS_SUMMON_COUNT; i++) {
+            summoned.push({
+              id: this.nextEnemyId++,
+              x: sx,
+              y: sy,
+              targetX: sx,
+              targetY: sy,
+              hp: summonHp,
+              maxHp: summonHp,
+              speed: BASE_ENEMY_SPEED_CELLS_PER_SECOND * normalStats.speedMultiplier,
+              tier: "normal",
+            });
+          }
+        }
+      }
+
       if (enemy.hp <= 0) {
         this.orbs.push({
           id: this.nextOrbId++,
           x: enemy.x,
           y: enemy.y,
-          value: resourceOrbValue(this.waveNumber),
+          value: RESOURCE_DROP_BY_TIER[enemy.tier],
           age: 0,
         });
-        this.score += enemy.boss ? SCORE_BOSS_KILL : enemy.elite ? SCORE_ELITE_KILL : SCORE_KILL;
-        this.pushFx(enemy.boss ? "boss-kill" : "kill", enemy.x, enemy.y);
+        this.score += scoreForTier(enemy.tier);
+        this.pushFx(enemy.tier === "boss" ? "boss-kill" : "kill", enemy.x, enemy.y);
         continue;
       }
       if (Math.round(enemy.x) === CORE_X && Math.round(enemy.y) === CORE_Y) {
         this.pushFx("core-hit", CORE_X, CORE_Y);
-        if (enemy.boss) {
+        if (enemy.tier === "boss") {
           // The boss reaching the core is an instant loss, not a scratch.
           this.coreHp = 0;
         } else {
@@ -434,10 +496,32 @@ export class Game {
       }
       survivors.push(enemy);
     }
-    this.enemies = survivors;
+    this.enemies = survivors.concat(summoned);
   }
 
   private stepEnemy(enemy: Enemy, dt: number): void {
+    // Flying enemies ignore the grid, blockades and BFS entirely — they fly
+    // straight at the core.
+    if (enemy.flying) {
+      const dx = CORE_X - enemy.x;
+      const dy = CORE_Y - enemy.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.02) {
+        enemy.x = CORE_X;
+        enemy.y = CORE_Y;
+        return;
+      }
+      const step = enemy.speed * dt;
+      if (step >= dist) {
+        enemy.x = CORE_X;
+        enemy.y = CORE_Y;
+      } else {
+        enemy.x += (dx / dist) * step;
+        enemy.y += (dy / dist) * step;
+      }
+      return;
+    }
+
     const dx = enemy.targetX - enemy.x;
     const dy = enemy.targetY - enemy.y;
     const distToTarget = Math.hypot(dx, dy);
@@ -487,32 +571,113 @@ export class Game {
 
   private updateUnits(dt: number): void {
     for (const [index, unit] of this.units) {
-      unit.cooldown -= dt;
-      if (unit.cooldown > 0) continue;
+      const ux = index % GRID_SIZE;
+      const uy = Math.floor(index / GRID_SIZE);
+      if (unit.kind === "blocker") {
+        this.updateBlocker(unit, ux, uy, dt);
+      } else {
+        this.updateRangedUnit(unit, ux, uy, dt);
+      }
+    }
+  }
 
-      const [ux, uy] = [index % GRID_SIZE, Math.floor(index / GRID_SIZE)];
-      const stats = UNIT_LEVELS[unit.level - 1];
-      let target: Enemy | undefined;
-      let bestDist = stats.rangeCells;
+  private updateRangedUnit(unit: Unit, ux: number, uy: number, dt: number): void {
+    unit.cooldown -= dt;
+    if (unit.cooldown > 0) return;
+
+    const stats = UNIT_KINDS[unit.kind];
+    const damage = stats.damageByLevel![unit.level - 1];
+    let target: Enemy | undefined;
+    let bestDist = stats.rangeCells;
+    for (const enemy of this.enemies) {
+      const dist = Math.hypot(enemy.x - ux, enemy.y - uy);
+      if (dist <= bestDist) {
+        bestDist = dist;
+        target = enemy;
+      }
+    }
+    if (!target) return;
+
+    target.hp -= damage;
+    unit.cooldown = stats.attackInterval!;
+    this.flashes.push({
+      fromX: ux,
+      fromY: uy,
+      toX: target.x,
+      toY: target.y,
+      targetId: target.id,
+      ttl: ATTACK_FLASH_TTL,
+    });
+
+    if (unit.kind === "splash") {
+      const radius = stats.splashRadiusCells!;
       for (const enemy of this.enemies) {
-        const dist = Math.hypot(enemy.x - ux, enemy.y - uy);
-        if (dist <= bestDist) {
-          bestDist = dist;
-          target = enemy;
+        if (enemy.id === target.id) continue;
+        if (Math.hypot(enemy.x - target.x, enemy.y - target.y) <= radius) enemy.hp -= damage;
+      }
+    }
+  }
+
+  /** Blocker never fires itself — each of its two minions independently
+   *  acquires, melees and can be killed by whatever's in range, respawning
+   *  after a cooldown. Minions never store a pixel position; render/ derives
+   *  where to draw them from this combat state alone. */
+  private updateBlocker(unit: Unit, ux: number, uy: number, dt: number): void {
+    const stats = UNIT_KINDS.blocker;
+    const range = stats.rangeCells;
+    const minions = unit.minions;
+    if (!minions) return;
+
+    const claimed = new Set<number>();
+    for (const minion of minions) {
+      if (minion.alive && minion.targetId !== null) claimed.add(minion.targetId);
+    }
+
+    for (const minion of minions) {
+      if (!minion.alive) {
+        minion.respawnTimer -= dt;
+        if (minion.respawnTimer <= 0) {
+          minion.alive = true;
+          minion.hp = minion.maxHp;
+          minion.targetId = null;
+          minion.cooldown = 0;
+        }
+        continue;
+      }
+
+      let target =
+        minion.targetId !== null ? this.enemies.find((e) => e.id === minion.targetId) : undefined;
+      if (target && Math.hypot(target.x - ux, target.y - uy) > range) target = undefined;
+
+      if (!target) {
+        minion.targetId = null;
+        let bestDist = range;
+        for (const enemy of this.enemies) {
+          if (claimed.has(enemy.id)) continue;
+          const dist = Math.hypot(enemy.x - ux, enemy.y - uy);
+          if (dist <= bestDist) {
+            bestDist = dist;
+            target = enemy;
+          }
+        }
+        if (target) {
+          minion.targetId = target.id;
+          claimed.add(target.id);
         }
       }
       if (!target) continue;
 
-      target.hp -= stats.damage;
-      unit.cooldown = stats.attackInterval;
-      this.flashes.push({
-        fromX: ux,
-        fromY: uy,
-        toX: target.x,
-        toY: target.y,
-        targetId: target.id,
-        ttl: ATTACK_FLASH_TTL,
-      });
+      minion.cooldown -= dt;
+      if (minion.cooldown > 0) continue;
+      minion.cooldown = BLOCKER_MINION_ATTACK_INTERVAL;
+
+      target.hp -= stats.minionDamageByLevel![unit.level - 1];
+      minion.hp -= MINION_INCOMING_DAMAGE_PER_HIT;
+      if (minion.hp <= 0) {
+        minion.alive = false;
+        minion.respawnTimer = stats.minionRespawnSeconds!;
+        minion.targetId = null;
+      }
     }
   }
 
@@ -548,7 +713,7 @@ export class Game {
       this.status = "lost";
       return;
     }
-    if (this.waveNumber >= TOTAL_WAVES && this.waveSpawnedCount >= waveConfig(TOTAL_WAVES).count) {
+    if (this.waveNumber >= TOTAL_WAVES && this.waveSpawnedCount >= waveTotalCount(TOTAL_WAVES)) {
       if (this.enemies.length === 0 && this.status === "playing") {
         this.status = "won";
         this.score += SCORE_WIN + SCORE_PER_REMAINING_CORE_HP * this.coreHp;

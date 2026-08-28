@@ -4,7 +4,7 @@ import type { Game } from "./game";
 import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
 import { callDotHitTest } from "./render/calldot";
-import { getSelectedLevel, selectorHitTest, setSelectedLevel } from "./render/selector";
+import { getSelectedKind, selectorHitTest, setSelectedKind } from "./render/selector";
 
 const DRAG_THRESHOLD_PX = 8;
 
@@ -44,9 +44,9 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
     if (session) return;
     const { px, py } = toCanvasPixel(event.clientX, event.clientY);
     const layout = computeLayout(canvas.width, canvas.height);
-    const sidebarLevel = selectorHitTest(layout, px, py);
-    if (sidebarLevel !== -1) {
-      setSelectedLevel(sidebarLevel);
+    const sidebarKind = selectorHitTest(layout, px, py);
+    if (sidebarKind !== null) {
+      setSelectedKind(sidebarKind);
       return;
     }
     if (callDotHitTest(game, layout, px, py)) {
@@ -92,7 +92,7 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
         game.tryMergeUnit(fromIndex, toIndex);
       }
     } else if (!game.tryCollectResource(gx, gy) && inBounds(endCellX, endCellY)) {
-      game.tryPlaceUnit(endCellX, endCellY, getSelectedLevel());
+      game.tryPlaceUnit(endCellX, endCellY, getSelectedKind());
     }
 
     canvas.releasePointerCapture(session.pointerId);

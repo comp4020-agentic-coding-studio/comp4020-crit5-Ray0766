@@ -1,7 +1,7 @@
 // Graphical preview of what's about to come through each vessel, live only
 // during (and just after) the prep window. Reads game.upcomingPlan — the
 // same data spawnEnemy will actually consume — so this is never a guess.
-import { BOSS_RADIUS_MULTIPLIER, ELITE_RADIUS_MULTIPLIER, ENTRANCES, FAST_SIZE_MULTIPLIER } from "../constants";
+import { ENEMY_TIERS, ENEMY_TIER_ORDER, ENTRANCES, type EnemyTier } from "../constants";
 import type { Game, SpawnPlan } from "../game";
 import { scaleFor, type Layout } from "./layout";
 import { MAGENTA_CORE, rgba } from "./palette";
@@ -13,46 +13,37 @@ const ICON_RADIUS_BASELINE = 9;
 const SLOT_WIDTH = 46;
 const INTEL_OFFSET_Y = 46;
 const FADE_DURATION = 0.4;
-const MAX_GROUPS_PER_ENTRANCE = 3;
+const MAX_GROUPS_PER_ENTRANCE = 4;
 
-type Tier = "boss" | "elite" | "fast" | "normal";
-const TIER_ORDER: readonly Tier[] = ["boss", "elite", "normal", "fast"];
-
-function tierOf(entry: SpawnPlan): Tier {
-  if (entry.boss) return "boss";
-  if (entry.elite) return "elite";
-  if (entry.fast) return "fast";
-  return "normal";
+function tierOf(entry: SpawnPlan): EnemyTier {
+  return entry.tier;
 }
 
-function radiusMultiplier(tier: Tier): number {
-  if (tier === "boss") return BOSS_RADIUS_MULTIPLIER;
-  if (tier === "elite") return ELITE_RADIUS_MULTIPLIER;
-  if (tier === "fast") return FAST_SIZE_MULTIPLIER;
-  return 1;
+function radiusMultiplier(tier: EnemyTier): number {
+  return ENEMY_TIERS[tier].sizeMultiplier;
 }
 
 // Negative so it can never collide with a real (positive) enemy id in the
 // shared silhouette-jitter cache — the preview still needs a stable seed of
 // its own so the shape doesn't reshuffle every frame.
-function seedFor(ex: number, ey: number, tier: Tier): number {
-  return -(1 + ex * 97 + ey * 13 + TIER_ORDER.indexOf(tier));
+function seedFor(ex: number, ey: number, tier: EnemyTier): number {
+  return -(1 + ex * 97 + ey * 13 + ENEMY_TIER_ORDER.indexOf(tier));
 }
 
 interface IntelGroup {
-  tier: Tier;
+  tier: EnemyTier;
   count: number;
   seed: number;
 }
 
 function groupsFor(game: Game, ex: number, ey: number): IntelGroup[] {
-  const counts = new Map<Tier, number>();
+  const counts = new Map<EnemyTier, number>();
   for (const entry of game.upcomingPlan) {
     if (entry.ex !== ex || entry.ey !== ey) continue;
     const tier = tierOf(entry);
     counts.set(tier, (counts.get(tier) ?? 0) + 1);
   }
-  return TIER_ORDER.filter((tier) => counts.has(tier))
+  return ENEMY_TIER_ORDER.filter((tier) => counts.has(tier))
     .slice(0, MAX_GROUPS_PER_ENTRANCE)
     .map((tier) => ({ tier, count: counts.get(tier)!, seed: seedFor(ex, ey, tier) }));
 }
@@ -82,7 +73,7 @@ function drawGroupRow(
     const radius = ICON_RADIUS_BASELINE * scale * radiusMultiplier(group.tier);
     const iconX = slotCenterX - 8 * scale;
     drawPathogenSilhouette(ctx, iconX, y, radius, group.seed, t, scale, {
-      sharp: group.tier === "fast",
+      sharp: group.tier === "spore",
       alpha,
     });
 
