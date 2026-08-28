@@ -50,6 +50,8 @@ export function prunePathogenCache(game: Game): void {
 
 interface SilhouetteOptions {
   sharp?: boolean;
+  thick?: boolean;
+  winged?: boolean;
   alpha?: number;
   color?: string;
 }
@@ -68,15 +70,17 @@ export function drawPathogenSilhouette(
   scale: number,
   options: SilhouetteOptions = {},
 ): void {
-  const { sharp = false, alpha = 1, color = MAGENTA } = options;
+  const { sharp = false, thick = false, winged = false, alpha = 1, color = MAGENTA } = options;
   const look = lookFor(seed);
   const vertices: Array<{ x: number; y: number; angle: number; radius: number }> = [];
 
   for (let i = 0; i < VERTEX_COUNT; i++) {
     const angle = (i / VERTEX_COUNT) * Math.PI * 2;
-    let r = radius * look.baseCoeffs[i] * (1 + 0.12 * Math.sin(1.4 * t + look.phases[i]));
-    if (look.isSpike[i]) r *= sharp ? SPIKE_MULTIPLIER * SHARP_EXAGGERATION : SPIKE_MULTIPLIER;
+    const swayScale = thick ? 0.05 : 0.12;
+    let r = radius * look.baseCoeffs[i] * (1 + swayScale * Math.sin(1.4 * t + look.phases[i]));
+    if (look.isSpike[i]) r *= sharp ? SPIKE_MULTIPLIER * SHARP_EXAGGERATION : thick ? 1.08 : SPIKE_MULTIPLIER;
     else if (sharp) r /= SHARP_EXAGGERATION;
+    else if (thick) r *= 1.05;
     vertices.push({
       x: cx + Math.cos(angle) * r,
       y: cy + Math.sin(angle) * r,
@@ -88,7 +92,7 @@ export function drawPathogenSilhouette(
   ctx.save();
   ctx.shadowColor = rgba(MAGENTA, 0.55 * alpha);
   ctx.shadowBlur = 15 * scale;
-  ctx.fillStyle = rgba(color, 0.3 * alpha);
+  ctx.fillStyle = rgba(color, (thick ? 0.42 : 0.3) * alpha);
   ctx.beginPath();
   vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
   ctx.closePath();
@@ -99,7 +103,7 @@ export function drawPathogenSilhouette(
   ctx.shadowColor = rgba(MAGENTA, 0.55 * alpha);
   ctx.shadowBlur = 8 * scale;
   ctx.strokeStyle = rgba(color, 0.55 * alpha);
-  ctx.lineWidth = 1 * scale;
+  ctx.lineWidth = (thick ? 2.2 : 1) * scale;
   ctx.beginPath();
   vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
   ctx.closePath();
@@ -131,6 +135,24 @@ export function drawPathogenSilhouette(
   ctx.arc(cx, cy, radius * 0.3, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  if (winged) {
+    const flap = Math.sin(t * 10 + look.phases[0]);
+    const wingSpan = radius * 1.1;
+    const lift = radius * 0.3 * flap;
+    ctx.save();
+    ctx.fillStyle = rgba(color, 0.35 * alpha);
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(cx + side * radius * 0.6, cy - lift);
+      ctx.rotate(side * (0.5 + flap * 0.3));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, wingSpan * 0.5, wingSpan * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
 }
 
 export function drawPathogens(
@@ -153,6 +175,8 @@ export function drawPathogens(
 
     drawPathogenSilhouette(ctx, cx, cy, r, enemy.id, t, scale, {
       sharp: enemy.tier === "spore",
+      thick: enemy.tier === "armored",
+      winged: enemy.tier === "flying",
       color: bodyColor,
     });
 

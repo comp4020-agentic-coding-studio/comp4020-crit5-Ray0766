@@ -74,6 +74,8 @@ function drawGroupRow(
     const iconX = slotCenterX - 8 * scale;
     drawPathogenSilhouette(ctx, iconX, y, radius, group.seed, t, scale, {
       sharp: group.tier === "spore",
+      thick: group.tier === "armored",
+      winged: group.tier === "flying",
       alpha,
     });
 
