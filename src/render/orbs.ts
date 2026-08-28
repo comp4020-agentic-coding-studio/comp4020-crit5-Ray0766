@@ -1,10 +1,31 @@
-import type { Game } from "../game";
+import type { Game, ResourceOrb } from "../game";
 import { RESOURCE_ORB_LIFETIME } from "../constants";
 import { hashAngle } from "./geometry";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { AMBER, AMBER_CORE, rgba } from "./palette";
 
 const FADE_WINDOW = 1.5;
+
+// Matches the solid ring drawn below - the crisp "ball" boundary a player
+// actually aims at, as opposed to the much bigger ambient glow halo.
+export const ORB_VISUAL_RADIUS_BASELINE = 9;
+
+/** Pixel-space hit-test against live orbs - mirrors selectorHitTest /
+ *  callDotHitTest so orb pickup follows the same convention instead of
+ *  round-tripping through the grid-fractional coordinate frame. */
+export function orbHitTest(game: Game, layout: Layout, px: number, py: number, radiusPx: number): ResourceOrb | null {
+  let best: ResourceOrb | null = null;
+  let bestDist = radiusPx;
+  for (const orb of game.orbs) {
+    const [ox, oy] = cellCenter(layout, orb.x, orb.y);
+    const dist = Math.hypot(px - ox, py - oy);
+    if (dist <= bestDist) {
+      bestDist = dist;
+      best = orb;
+    }
+  }
+  return best;
+}
 
 export function drawOrbs(ctx: CanvasRenderingContext2D, game: Game, layout: Layout, t: number): void {
   const scale = scaleFor(layout);

@@ -14,10 +14,10 @@ import {
   MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
   MINION_INCOMING_DAMAGE_PER_HIT,
+  ORB_DRIFT_CELLS_PER_SECOND,
   PREP_SECONDS,
   RESOURCE_DROP_BY_TIER,
   RESOURCE_ORB_LIFETIME,
-  RESOURCE_PICKUP_RADIUS_CELLS,
   SCORE_PER_REMAINING_CORE_HP,
   SCORE_WIN,
   SPAWN_INTERVAL_SECONDS,
@@ -251,21 +251,14 @@ export class Game {
     return true;
   }
 
-  /** Collect the nearest resource orb within pickup range, if any. */
-  tryCollectResource(x: number, y: number): boolean {
-    let bestIndex = -1;
-    let bestDist = RESOURCE_PICKUP_RADIUS_CELLS;
-    for (let i = 0; i < this.orbs.length; i++) {
-      const orb = this.orbs[i];
-      const dist = Math.hypot(orb.x - x, orb.y - y);
-      if (dist <= bestDist) {
-        bestDist = dist;
-        bestIndex = i;
-      }
-    }
-    if (bestIndex === -1) return false;
-    this.resource += this.orbs[bestIndex].value;
-    this.orbs.splice(bestIndex, 1);
+  /** Collect a specific resource orb by id, if it's still on the field.
+   *  Which orb (if any) got hit is decided by pixel-space hit-testing in
+   *  render/orbs.ts; this just executes the collection. */
+  collectOrb(id: number): boolean {
+    const index = this.orbs.findIndex((orb) => orb.id === id);
+    if (index === -1) return false;
+    this.resource += this.orbs[index].value;
+    this.orbs.splice(index, 1);
     return true;
   }
 
@@ -685,7 +678,17 @@ export class Game {
     const alive: ResourceOrb[] = [];
     for (const orb of this.orbs) {
       orb.age += dt;
-      if (orb.age < RESOURCE_ORB_LIFETIME) alive.push(orb);
+      if (orb.age < RESOURCE_ORB_LIFETIME) {
+        const dx = CORE_X - orb.x;
+        const dy = CORE_Y - orb.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0.01) {
+          const step = Math.min(dist, ORB_DRIFT_CELLS_PER_SECOND * dt);
+          orb.x += (dx / dist) * step;
+          orb.y += (dy / dist) * step;
+        }
+        alive.push(orb);
+      }
     }
     this.orbs = alive;
   }

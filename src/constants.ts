@@ -34,7 +34,7 @@ export const CORE_MAX_HP = 12;
 export const START_RESOURCE = 130;
 
 export const RESOURCE_ORB_LIFETIME = 6; // seconds
-export const RESOURCE_PICKUP_RADIUS_CELLS = 0.6;
+export const ORB_DRIFT_CELLS_PER_SECOND = 0.35;
 
 export const TOTAL_WAVES = 8;
 export const PREP_SECONDS = 20;
