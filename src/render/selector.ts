@@ -1,6 +1,6 @@
 import type { Game } from "../game";
 import { GRID_SIZE, UNIT_KINDS, UNIT_KIND_ORDER, type UnitKind } from "../constants";
-import { drawBlockerBody, drawHeavyBody, drawRapidBody, drawSplashBody } from "./cells";
+import { drawBlockerBody, drawHeavyBody, drawIdleSatellites, drawRapidBody, drawSplashBody } from "./cells";
 import { scaleFor, type Layout } from "./layout";
 import { CYAN_CORE, rgba } from "./palette";
 
@@ -26,18 +26,26 @@ export interface SelectorSlot {
   radius: number;
 }
 
+// A compact, vertically-centered cluster with equal spacing between icons,
+// rather than spreading them across the whole board height.
+const SLOT_SPACING_BASELINE = 76;
+const ICON_RADIUS_BASELINE = 17;
+
 export function selectorSlots(layout: Layout): SelectorSlot[] {
+  const scale = scaleFor(layout);
   const boardRight = layout.offsetX + layout.cellSize * GRID_SIZE;
   const cx = boardRight + layout.hudRight / 2;
-  const boardHeight = layout.cellSize * GRID_SIZE;
-  const bandHeight = boardHeight / UNIT_KIND_ORDER.length;
-  const radius = Math.min(layout.hudRight, bandHeight) * 0.32;
+  const boardCenterY = layout.offsetY + (layout.cellSize * GRID_SIZE) / 2;
+  const spacing = SLOT_SPACING_BASELINE * scale;
+  const radius = Math.min(layout.hudRight * 0.4, ICON_RADIUS_BASELINE * scale);
+  const n = UNIT_KIND_ORDER.length;
+  const startY = boardCenterY - (spacing * (n - 1)) / 2;
   const slots: SelectorSlot[] = [];
-  for (let i = 0; i < UNIT_KIND_ORDER.length; i++) {
+  for (let i = 0; i < n; i++) {
     slots.push({
       kind: UNIT_KIND_ORDER[i],
       cx,
-      cy: layout.offsetY + bandHeight * (i + 0.5),
+      cy: startY + spacing * i,
       radius,
     });
   }
@@ -58,6 +66,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, kind: UnitKind, slot: SelectorS
     drawRapidBody(ctx, slot.cx, slot.cy, slot.radius * 1.05, 0, scale, 1);
   } else if (kind === "blocker") {
     drawBlockerBody(ctx, slot.cx, slot.cy, slot.radius * 0.8, 1, scale);
+    drawIdleSatellites(ctx, slot.cx, slot.cy, slot.radius * 1.35, slot.radius * 0.22, t, scale);
   } else if (kind === "heavy") {
     drawHeavyBody(ctx, slot.cx, slot.cy, slot.radius * 0.95, 1, scale);
   } else {

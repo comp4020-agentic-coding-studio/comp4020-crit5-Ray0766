@@ -34,9 +34,9 @@ export function drawLeaf(
   ctx.restore();
 
   ctx.save();
-  const coreAlpha = Math.min(1, 0.95 * k);
+  const coreAlpha = Math.min(1, 1.2 * k);
   ctx.shadowColor = rgba(CYAN_CORE, coreAlpha);
-  ctx.shadowBlur = 12 * scale * (0.7 + 0.6 * k);
+  ctx.shadowBlur = 20 * scale * (1.0 + 0.6 * k);
   ctx.fillStyle = rgba(CYAN_CORE, coreAlpha);
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.36, 0, Math.PI * 2);
@@ -101,7 +101,8 @@ export function drawRapidBody(
   }
 }
 
-/** blocker (B): one plain body — the minions it fields are drawn separately. */
+/** blocker (B): one plain body — the minions it fields are drawn separately
+ *  on the real board (drawMinions) or as a static pair here (drawIdleSatellites). */
 export function drawBlockerBody(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -113,7 +114,34 @@ export function drawBlockerBody(
   drawLeaf(ctx, cx, cy, radius, k, scale);
 }
 
-/** heavy (C): large and dense — the same body plus an inner ring for weight. */
+/** Two bright dots orbiting a fixed pixel radius — a static stand-in for the
+ *  real minions, used where there's no unit/game state to draw them from
+ *  (the sidebar icon). */
+export function drawIdleSatellites(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  orbitRadiusPx: number,
+  dotRadiusPx: number,
+  t: number,
+  scale: number,
+): void {
+  for (let i = 0; i < 2; i++) {
+    const angle = i * Math.PI + t * 0.9;
+    const mx = cx + Math.cos(angle) * orbitRadiusPx;
+    const my = cy + Math.sin(angle) * orbitRadiusPx;
+    ctx.save();
+    ctx.shadowColor = rgba(CYAN_CORE, 0.75);
+    ctx.shadowBlur = 6 * scale;
+    ctx.fillStyle = rgba(CYAN_CORE, 0.9);
+    ctx.beginPath();
+    ctx.arc(mx, my, dotRadiusPx, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/** heavy (C): large and dense — the same body plus a crisp, solid inner ring for weight. */
 export function drawHeavyBody(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -125,12 +153,44 @@ export function drawHeavyBody(
   drawLeaf(ctx, cx, cy, radius, k, scale);
   ctx.save();
   ctx.shadowColor = rgba(CYAN, 0.5);
-  ctx.shadowBlur = 6 * scale;
-  ctx.strokeStyle = rgba(CYAN, 0.55 * Math.min(1, k));
+  ctx.shadowBlur = 2 * scale;
+  ctx.strokeStyle = rgba(CYAN, 0.9 * Math.min(1, k));
   ctx.lineWidth = 1.5 * scale;
   ctx.beginPath();
   ctx.arc(cx, cy, radius * 0.58, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
+}
+
+/** Short spikes anchored to the membrane's own wavy edge, so splash (D)
+ *  reads as "membrane + spikes" rather than "membrane" alone. */
+function drawMembraneSpikes(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  seed: number,
+  t: number,
+  scale: number,
+): void {
+  const spikeCount = 6;
+  ctx.save();
+  ctx.strokeStyle = rgba(CYAN, 0.6);
+  ctx.lineWidth = 1.3 * scale;
+  for (let i = 0; i < spikeCount; i++) {
+    const a = (i / spikeCount) * Math.PI * 2;
+    const perturb = 1 + 0.07 * Math.sin(3 * a + seed) + 0.05 * Math.sin(5 * a - 0.5 * t + seed);
+    const rr = r * perturb;
+    const spikeLen = r * 0.22;
+    const innerX = cx + Math.cos(a) * rr;
+    const innerY = cy + Math.sin(a) * rr;
+    const outerX = cx + Math.cos(a) * (rr + spikeLen);
+    const outerY = cy + Math.sin(a) * (rr + spikeLen);
+    ctx.beginPath();
+    ctx.moveTo(innerX, innerY);
+    ctx.lineTo(outerX, outerY);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -146,12 +206,13 @@ export function drawSplashBody(
   k: number,
 ): void {
   drawMembrane(ctx, cx, cy, radius, seed, t, scale);
+  drawMembraneSpikes(ctx, cx, cy, radius, seed, t, scale);
   drawLeaf(ctx, cx, cy, radius * 0.34, k, scale);
 }
 
 const MINION_ORBIT_RADIUS_CELLS = 0.34;
 const MINION_ENGAGE_CLAMP_FACTOR = 0.85;
-const MINION_DOT_RADIUS_BASELINE = 4;
+const MINION_DOT_RADIUS_BASELINE = 5;
 
 function minionIdlePixel(
   ux: number,
@@ -239,7 +300,7 @@ export function drawUnits(ctx: CanvasRenderingContext2D, game: Game, layout: Lay
     const radius = 15 * scale * breathe * size;
 
     if (unit.kind === "rapid") {
-      drawRapidBody(ctx, cx, cy, radius, seed, scale, unit.level);
+      drawRapidBody(ctx, cx, cy, radius * 0.8, seed, scale, unit.level);
     } else if (unit.kind === "heavy") {
       drawHeavyBody(ctx, cx, cy, radius * 1.15, k, scale);
     } else if (unit.kind === "splash") {
