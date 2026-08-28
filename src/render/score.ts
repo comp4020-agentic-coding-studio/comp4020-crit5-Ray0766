@@ -37,9 +37,14 @@ interface ScorePopup {
 }
 
 let popups: ScorePopup[] = [];
+const SCORE_FLASH_DURATION = 0.25;
+let scoreFlashAt = -Infinity;
 
 function ingestScore(game: Game, t: number): void {
-  if (game.score > lastScore) popups.push({ value: game.score - lastScore, startedAt: t });
+  if (game.score > lastScore) {
+    popups.push({ value: game.score - lastScore, startedAt: t });
+    scoreFlashAt = t;
+  }
   lastScore = game.score;
   if (game.score > highScore) {
     highScore = game.score;
@@ -64,20 +69,25 @@ export function drawScoreSidebar(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  ctx.font = `${20 * scale}px ${FONT_STACK}`;
-  ctx.fillStyle = rgba(CYAN_CORE, 0.9);
+  const flashProgress = Math.min(1, (t - scoreFlashAt) / SCORE_FLASH_DURATION);
+  const flashPunch = flashProgress < 1 ? 1 - flashProgress : 0;
+  ctx.font = `${(28 + 6 * flashPunch) * scale}px ${FONT_STACK}`;
+  ctx.fillStyle = rgba(CYAN_CORE, 1);
+  ctx.shadowColor = rgba(CYAN_CORE, 0.8 * flashPunch);
+  ctx.shadowBlur = 14 * scale * flashPunch;
   ctx.fillText(String(game.score), cx, scoreY);
+  ctx.shadowBlur = 0;
 
   ctx.font = `${11 * scale}px ${FONT_STACK}`;
   ctx.fillStyle = rgba(CYAN_CORE, 0.45);
   ctx.fillText(String(highScore), cx, highY);
 
-  ctx.font = `${13 * scale}px ${FONT_STACK}`;
+  ctx.font = `bold ${18 * scale}px ${FONT_STACK}`;
   const popupX = cx + layout.hudLeft * 0.32;
   for (const popup of popups) {
     const progress = Math.min(1, (t - popup.startedAt) / POPUP_DURATION);
     ctx.fillStyle = rgba(CYAN_CORE, 1 - progress);
-    const y = scoreY - (6 + 20 * progress) * scale;
+    const y = scoreY - (6 + 26 * progress) * scale;
     ctx.fillText(`+${popup.value}`, popupX, y);
   }
 }
