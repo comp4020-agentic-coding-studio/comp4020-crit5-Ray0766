@@ -36,7 +36,7 @@ export function drawLeaf(
   ctx.save();
   const coreAlpha = Math.min(1, 1.2 * k);
   ctx.shadowColor = rgba(CYAN_CORE, coreAlpha);
-  ctx.shadowBlur = 20 * scale * (1.0 + 0.6 * k);
+  ctx.shadowBlur = 28 * scale * (1.3 + 0.6 * k);
   ctx.fillStyle = rgba(CYAN_CORE, coreAlpha);
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.36, 0, Math.PI * 2);

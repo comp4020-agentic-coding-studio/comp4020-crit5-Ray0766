@@ -91,7 +91,7 @@ export function drawPathogenSilhouette(
 
   ctx.save();
   ctx.shadowColor = rgba(MAGENTA, 0.55 * alpha);
-  ctx.shadowBlur = 15 * scale;
+  ctx.shadowBlur = 10 * scale;
   ctx.fillStyle = rgba(color, (thick ? 0.42 : 0.3) * alpha);
   ctx.beginPath();
   vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
@@ -101,7 +101,7 @@ export function drawPathogenSilhouette(
 
   ctx.save();
   ctx.shadowColor = rgba(MAGENTA, 0.55 * alpha);
-  ctx.shadowBlur = 8 * scale;
+  ctx.shadowBlur = 6 * scale;
   ctx.strokeStyle = rgba(color, 0.55 * alpha);
   ctx.lineWidth = (thick ? 2.2 : 1) * scale;
   ctx.beginPath();
