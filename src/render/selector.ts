@@ -84,7 +84,7 @@ export function drawSelector(ctx: CanvasRenderingContext2D, game: Game, layout: 
     const affordable = game.resource >= cost;
 
     ctx.save();
-    ctx.globalAlpha = affordable ? 1 : 0.3;
+    ctx.globalAlpha *= affordable ? 1 : 0.3;
     drawIcon(ctx, slot.kind, slot, t, scale);
     ctx.restore();
 
