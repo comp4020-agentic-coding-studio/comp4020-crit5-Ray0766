@@ -59,3 +59,15 @@ dragging merges.
    and raising the starting resource so a second and third placement are both
    reachable well before the pathogens pile up.
    [2b97f19](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/2b97f19)
+
+5. Another one from actually playing rather than reading the code. A few
+   waves into a run with three or four cells down and pathogens dying all
+   over the board, I noticed I'd stopped clicking the orbs at all --- there
+   were just too many going off at once to chase each one down, so half my
+   income was sitting on the field decaying away unclaimed while I focused on
+   placement instead. That's not a bug in the pickup logic, it's the pickup
+   step itself being the wrong idea once the game gets busy. Pulled the whole
+   orb system out --- spawning, drift, magnet, click hit-test, the 6s expiry
+   --- and made a kill credit resource the instant it happens, with an amber
+   floater and a HUD punch standing in for the old "watch it land" feedback.
+   [bd0ae4a](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/bd0ae4a)
