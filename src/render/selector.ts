@@ -1,6 +1,6 @@
 import type { Game } from "../game";
 import { GRID_SIZE, UNIT_KINDS, UNIT_KIND_ORDER, type UnitKind } from "../constants";
-import { drawLeaf, drawMembrane } from "./cells";
+import { drawBlockerBody, drawHeavyBody, drawRapidBody, drawSplashBody } from "./cells";
 import { scaleFor, type Layout } from "./layout";
 import { CYAN_CORE, rgba } from "./palette";
 
@@ -55,29 +55,13 @@ export function selectorHitTest(layout: Layout, px: number, py: number): UnitKin
 
 function drawIcon(ctx: CanvasRenderingContext2D, kind: UnitKind, slot: SelectorSlot, t: number, scale: number): void {
   if (kind === "rapid") {
-    const r = slot.radius * 0.5;
-    const d = slot.radius * 0.4;
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2;
-      drawLeaf(ctx, slot.cx + Math.cos(a) * d, slot.cy + Math.sin(a) * d, r, 1, scale);
-    }
+    drawRapidBody(ctx, slot.cx, slot.cy, slot.radius * 1.05, 0, scale, 1);
   } else if (kind === "blocker") {
-    const r = slot.radius * 0.62;
-    const d = slot.radius * 0.5;
-    drawLeaf(ctx, slot.cx - d, slot.cy, r, 1, scale);
-    drawLeaf(ctx, slot.cx + d, slot.cy, r, 1, scale);
+    drawBlockerBody(ctx, slot.cx, slot.cy, slot.radius * 0.8, 1, scale);
   } else if (kind === "heavy") {
-    drawLeaf(ctx, slot.cx, slot.cy, slot.radius * 1.0, 1.3, scale);
+    drawHeavyBody(ctx, slot.cx, slot.cy, slot.radius * 0.95, 1, scale);
   } else {
-    drawMembrane(ctx, slot.cx, slot.cy, slot.radius * 0.95, 2, t, scale);
-    const innerLeafCount = 5;
-    const orbitRadius = slot.radius * 0.42;
-    for (let i = 0; i < innerLeafCount; i++) {
-      const a = (i / innerLeafCount) * Math.PI * 2;
-      const lx = slot.cx + Math.cos(a) * orbitRadius;
-      const ly = slot.cy + Math.sin(a) * orbitRadius;
-      drawLeaf(ctx, lx, ly, slot.radius * 0.3, 0.8, scale);
-    }
+    drawSplashBody(ctx, slot.cx, slot.cy, slot.radius * 0.95, 2, t, scale, 1);
   }
 }
 

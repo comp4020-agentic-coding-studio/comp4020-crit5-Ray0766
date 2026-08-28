@@ -6,6 +6,7 @@ import { drawCombo } from "./render/combo";
 import { drawCoreFlash } from "./render/coreflash";
 import { drawFx } from "./render/fx";
 import { drawHearts } from "./render/hearts";
+import { drawImpactFx } from "./render/impactfx";
 import { drawWaveIntel } from "./render/intel";
 import { computeLayout, type Layout } from "./render/layout";
 import { drawNumbers } from "./render/numbers";
@@ -45,6 +46,7 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawAttackTrails(ctx, game, layout);
   drawHeart(ctx, game, layout, t);
   drawFx(ctx, game, layout, t);
+  drawImpactFx(ctx, game, layout, t);
   drawCoreFlash(ctx, game, width, height, t);
   drawPathLength(ctx, game, layout, t);
   drawCallDot(ctx, game, layout, t);
