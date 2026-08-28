@@ -331,7 +331,7 @@ export function drawHeart(ctx: CanvasRenderingContext2D, game: Game, layout: Lay
   const gk = 0.55 + 0.5 * b;
   const ringPeakAlpha = 0.3 + 0.2 * injury;
 
-  const glowRadius = (120 * s + 40) * scale;
+  const glowRadius = (192 * s + 64) * scale;
   const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowRadius);
   glow.addColorStop(0, rgba(bodyColor, 0.3 * gk));
   glow.addColorStop(0.5, rgba(bodyColor, 0.1 * gk));
@@ -341,7 +341,9 @@ export function drawHeart(ctx: CanvasRenderingContext2D, game: Game, layout: Lay
   ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  const bodyRadius = 40 * s * scale;
+  // 1.6x the pre-round-7 size — it's the one thing on the whole board every
+  // wave is actually defending, and it used to read smaller than the boss.
+  const bodyRadius = 64 * s * scale;
   drawHeartShape(ctx, cx, cy, bodyRadius, t, {
     fillColor: bodyColor,
     fillAlpha: 0.22,
@@ -367,7 +369,9 @@ export function drawHeart(ctx: CanvasRenderingContext2D, game: Game, layout: Lay
   ctx.fill();
   ctx.restore();
 
-  const ringRadius = (46 + (196 - 46) * ph) * scale;
+  // Pulse ring's own radii scaled with the body so it still emanates from
+  // the heart's new, bigger edge instead of starting inside it.
+  const ringRadius = (74 + (314 - 74) * ph) * scale;
   ctx.strokeStyle = rgba(bodyColor, ringPeakAlpha * (1 - ph) * (1 - ph));
   ctx.lineWidth = 2 * scale;
   ctx.beginPath();
