@@ -4,15 +4,9 @@ import type { Game } from "./game";
 import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
 import { callDotHitTest } from "./render/calldot";
-import { scaleFor } from "./render/layout";
-import { ORB_VISUAL_RADIUS_BASELINE, orbHitTest } from "./render/orbs";
 import { getSelectedKind, selectorHitTest, setSelectedKind } from "./render/selector";
 
 const DRAG_THRESHOLD_PX = 8;
-// Click hit-region: modest slack around the orb's solid ring, still roughly
-// aim-and-click. Magnet: much bigger, hover-triggered, no click needed.
-const ORB_CLICK_HIT_MULTIPLIER = 1.8;
-const ORB_MAGNET_RADIUS_BASELINE = 40;
 
 interface PointerSession {
   pointerId: number;
@@ -72,12 +66,8 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
   });
 
   canvas.addEventListener("pointermove", (event) => {
-    const { px, py } = toCanvasPixel(event.clientX, event.clientY);
-    const layout = computeLayout(canvas.width, canvas.height);
-    const magnetHit = orbHitTest(game, layout, px, py, ORB_MAGNET_RADIUS_BASELINE * scaleFor(layout));
-    if (magnetHit) game.collectOrb(magnetHit.id);
-
     if (!session || event.pointerId !== session.pointerId) return;
+    const { px, py } = toCanvasPixel(event.clientX, event.clientY);
     if (!session.dragging) {
       const moved = Math.hypot(px - session.startPx, py - session.startPy);
       if (moved > DRAG_THRESHOLD_PX) session.dragging = true;
@@ -101,14 +91,8 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
         const toIndex = cellIndex(game.grid, endCellX, endCellY);
         game.tryMergeUnit(fromIndex, toIndex);
       }
-    } else {
-      const clickRadius = ORB_VISUAL_RADIUS_BASELINE * scaleFor(layout) * ORB_CLICK_HIT_MULTIPLIER;
-      const hit = orbHitTest(game, layout, px, py, clickRadius);
-      if (hit) {
-        game.collectOrb(hit.id);
-      } else if (inBounds(endCellX, endCellY)) {
-        game.tryPlaceUnit(endCellX, endCellY, getSelectedKind());
-      }
+    } else if (inBounds(endCellX, endCellY)) {
+      game.tryPlaceUnit(endCellX, endCellY, getSelectedKind());
     }
 
     canvas.releasePointerCapture(session.pointerId);

@@ -14,10 +14,8 @@ import {
   MAJOR_ENTRANCES,
   MAX_UNIT_LEVEL,
   MINION_INCOMING_DAMAGE_PER_HIT,
-  ORB_DRIFT_CELLS_PER_SECOND,
   PREP_SECONDS,
   RESOURCE_DROP_BY_TIER,
-  RESOURCE_ORB_LIFETIME,
   SCORE_PER_REMAINING_CORE_HP,
   SCORE_WIN,
   SPAWN_INTERVAL_SECONDS,
@@ -79,14 +77,6 @@ export interface SpawnPlan {
   tier: EnemyTier;
 }
 
-export interface ResourceOrb {
-  id: number;
-  x: number;
-  y: number;
-  value: number;
-  age: number;
-}
-
 export const ATTACK_FLASH_TTL = 0.1;
 
 export interface AttackFlash {
@@ -117,6 +107,7 @@ export interface FxEvent {
   x: number;
   y: number;
   ttl: number;
+  value?: number;
 }
 
 export type GameStatus = "playing" | "won" | "lost";
@@ -136,7 +127,6 @@ export class Game {
   units = new Map<number, Unit>();
   scars = new Set<number>();
   enemies: Enemy[] = [];
-  orbs: ResourceOrb[] = [];
   flashes: AttackFlash[] = [];
   fx: FxEvent[] = [];
 
@@ -152,7 +142,6 @@ export class Game {
   upcomingPlan: SpawnPlan[] = [];
 
   private nextEnemyId = 1;
-  private nextOrbId = 1;
   private planWaveNumber = 0;
   private rand: () => number = Math.random;
 
@@ -164,8 +153,8 @@ export class Game {
     this.distanceField = distanceFromCore(this.grid);
   }
 
-  private pushFx(kind: FxKind, x: number, y: number): void {
-    this.fx.push({ kind, x, y, ttl: 0.15 });
+  private pushFx(kind: FxKind, x: number, y: number, value?: number): void {
+    this.fx.push({ kind, x, y, ttl: 0.15, value });
   }
 
   /** Attempt to place a fresh unit of the given kind on an empty cell, at
@@ -251,17 +240,6 @@ export class Game {
     return true;
   }
 
-  /** Collect a specific resource orb by id, if it's still on the field.
-   *  Which orb (if any) got hit is decided by pixel-space hit-testing in
-   *  render/orbs.ts; this just executes the collection. */
-  collectOrb(id: number): boolean {
-    const index = this.orbs.findIndex((orb) => orb.id === id);
-    if (index === -1) return false;
-    this.resource += this.orbs[index].value;
-    this.orbs.splice(index, 1);
-    return true;
-  }
-
   unitAt(x: number, y: number): Unit | undefined {
     return this.units.get(cellIndex(this.grid, x, y));
   }
@@ -299,7 +277,6 @@ export class Game {
     this.units.clear();
     this.scars.clear();
     this.enemies = [];
-    this.orbs = [];
     this.flashes = [];
     this.fx = [];
     this.resource = START_RESOURCE;
@@ -318,7 +295,6 @@ export class Game {
     this.updateWaveSpawner(dt);
     this.updateEnemies(dt);
     this.updateUnits(dt);
-    this.updateOrbs(dt);
     this.updateFlashes(dt);
     this.updateFx(dt);
     this.checkEndConditions();
@@ -466,15 +442,10 @@ export class Game {
       }
 
       if (enemy.hp <= 0) {
-        this.orbs.push({
-          id: this.nextOrbId++,
-          x: enemy.x,
-          y: enemy.y,
-          value: RESOURCE_DROP_BY_TIER[enemy.tier],
-          age: 0,
-        });
+        const value = RESOURCE_DROP_BY_TIER[enemy.tier];
+        this.resource += value;
         this.score += scoreForTier(enemy.tier);
-        this.pushFx(enemy.tier === "boss" ? "boss-kill" : "kill", enemy.x, enemy.y);
+        this.pushFx(enemy.tier === "boss" ? "boss-kill" : "kill", enemy.x, enemy.y, value);
         continue;
       }
       if (Math.round(enemy.x) === CORE_X && Math.round(enemy.y) === CORE_Y) {
@@ -672,25 +643,6 @@ export class Game {
         minion.targetId = null;
       }
     }
-  }
-
-  private updateOrbs(dt: number): void {
-    const alive: ResourceOrb[] = [];
-    for (const orb of this.orbs) {
-      orb.age += dt;
-      if (orb.age < RESOURCE_ORB_LIFETIME) {
-        const dx = CORE_X - orb.x;
-        const dy = CORE_Y - orb.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 0.01) {
-          const step = Math.min(dist, ORB_DRIFT_CELLS_PER_SECOND * dt);
-          orb.x += (dx / dist) * step;
-          orb.y += (dy / dist) * step;
-        }
-        alive.push(orb);
-      }
-    }
-    this.orbs = alive;
   }
 
   private updateFlashes(dt: number): void {

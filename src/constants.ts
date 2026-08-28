@@ -33,9 +33,6 @@ export const MINOR_VESSEL_WIDTH_CELLS = 0.55;
 export const CORE_MAX_HP = 12;
 export const START_RESOURCE = 130;
 
-export const RESOURCE_ORB_LIFETIME = 6; // seconds
-export const ORB_DRIFT_CELLS_PER_SECOND = 0.35;
-
 export const TOTAL_WAVES = 8;
 export const PREP_SECONDS = 3;
 export const EARLY_CALL_RESOURCE_PER_SECOND = 8;
