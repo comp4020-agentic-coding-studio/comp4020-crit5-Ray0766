@@ -1,26 +1,34 @@
 // Graphical preview of what's about to come through each vessel, live only
 // during (and just after) the prep window. Reads game.upcomingPlan — the
 // same data spawnEnemy will actually consume — so this is never a guess.
-import { ENEMY_TIERS, ENEMY_TIER_ORDER, ENTRANCES, type EnemyTier } from "../constants";
+import { ENEMY_TIER_ORDER, ENTRANCES, type EnemyTier } from "../constants";
 import type { Game, SpawnPlan } from "../game";
 import { scaleFor, type Layout } from "./layout";
-import { MAGENTA_CORE, rgba } from "./palette";
+import { MAGENTA, MAGENTA_CORE, rgba } from "./palette";
 import { drawPathogenSilhouette } from "./pathogens";
 import type { VesselPath } from "./vessels";
 
 const FONT_STACK = '"IBM Plex Mono", ui-monospace, monospace';
-const ICON_RADIUS_BASELINE = 9;
-const SLOT_WIDTH = 46;
+// One flat icon size for every "normal" group so a glance at the column
+// reads as consistent slots, not a jumble of tier-scaled sizes; elite/boss
+// break out of that on purpose (see BIG_TIER_MULTIPLIER below).
+const ICON_RADIUS_BASELINE = 20;
+// Derived, not a second hardcoded literal, so it can't drift out of sync
+// with the icon size - keeps roughly the same font/diameter ratio the old
+// 14px-on-18px-diameter layout already had (~0.78).
+const LABEL_FONT_SCALE = 0.8;
+const GROUP_ROW_HEIGHT_BASELINE = 50;
 const INTEL_OFFSET_Y = 46;
 const FADE_DURATION = 0.4;
-const MAX_GROUPS_PER_ENTRANCE = 4;
+const MAX_GROUPS_PER_ENTRANCE = 3;
+const BIG_TIER_MULTIPLIER = 1.5;
 
 function tierOf(entry: SpawnPlan): EnemyTier {
   return entry.tier;
 }
 
-function radiusMultiplier(tier: EnemyTier): number {
-  return ENEMY_TIERS[tier].sizeMultiplier;
+function isBigTier(tier: EnemyTier): boolean {
+  return tier === "elite" || tier === "boss";
 }
 
 // Negative so it can never collide with a real (positive) enemy id in the
@@ -36,6 +44,10 @@ interface IntelGroup {
   seed: number;
 }
 
+// Groups by tier (one silhouette + ×N per tier present), strongest first.
+// Caps at MAX_GROUPS_PER_ENTRANCE — anything beyond the cap gets folded
+// into the last group's count rather than dropped, so the total displayed
+// count always matches what's actually queued.
 function groupsFor(game: Game, ex: number, ey: number): IntelGroup[] {
   const counts = new Map<EnemyTier, number>();
   for (const entry of game.upcomingPlan) {
@@ -43,9 +55,18 @@ function groupsFor(game: Game, ex: number, ey: number): IntelGroup[] {
     const tier = tierOf(entry);
     counts.set(tier, (counts.get(tier) ?? 0) + 1);
   }
-  return ENEMY_TIER_ORDER.filter((tier) => counts.has(tier))
-    .slice(0, MAX_GROUPS_PER_ENTRANCE)
-    .map((tier) => ({ tier, count: counts.get(tier)!, seed: seedFor(ex, ey, tier) }));
+  const present = ENEMY_TIER_ORDER.filter((tier) => counts.has(tier));
+  const toGroup = (tier: EnemyTier, count: number): IntelGroup => ({ tier, count, seed: seedFor(ex, ey, tier) });
+
+  if (present.length <= MAX_GROUPS_PER_ENTRANCE) {
+    return present.map((tier) => toGroup(tier, counts.get(tier)!));
+  }
+
+  const kept = present.slice(0, MAX_GROUPS_PER_ENTRANCE - 1);
+  const overflow = present.slice(MAX_GROUPS_PER_ENTRANCE - 1);
+  const mergedTier = overflow[0];
+  const mergedCount = overflow.reduce((sum, tier) => sum + counts.get(tier)!, 0);
+  return [...kept.map((tier) => toGroup(tier, counts.get(tier)!)), toGroup(mergedTier, mergedCount)];
 }
 
 let lastInPrep = false;
@@ -56,7 +77,7 @@ function ingestPrepState(game: Game, t: number): void {
   lastInPrep = game.inPrep;
 }
 
-function drawGroupRow(
+function drawGroupColumn(
   ctx: CanvasRenderingContext2D,
   groups: IntelGroup[],
   anchorX: number,
@@ -65,14 +86,23 @@ function drawGroupRow(
   t: number,
   alpha: number,
 ): void {
-  const y = anchorY - INTEL_OFFSET_Y * scale;
-  const totalWidth = groups.length * SLOT_WIDTH * scale;
-  let slotCenterX = anchorX - totalWidth / 2 + (SLOT_WIDTH * scale) / 2;
+  groups.forEach((group, i) => {
+    const big = isBigTier(group.tier);
+    const radius = ICON_RADIUS_BASELINE * scale * (big ? BIG_TIER_MULTIPLIER : 1);
+    const y = anchorY - (INTEL_OFFSET_Y + i * GROUP_ROW_HEIGHT_BASELINE) * scale;
 
-  for (const group of groups) {
-    const radius = ICON_RADIUS_BASELINE * scale * radiusMultiplier(group.tier);
-    const iconX = slotCenterX - 8 * scale;
-    drawPathogenSilhouette(ctx, iconX, y, radius, group.seed, t, scale, {
+    if (big) {
+      ctx.save();
+      ctx.shadowColor = rgba(MAGENTA_CORE, 0.6 * alpha);
+      ctx.shadowBlur = 16 * scale;
+      ctx.fillStyle = rgba(MAGENTA, 0.25 * alpha);
+      ctx.beginPath();
+      ctx.arc(anchorX, y, radius * 1.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawPathogenSilhouette(ctx, anchorX, y, radius, group.seed, t, scale, {
       sharp: group.tier === "spore",
       thick: group.tier === "armored",
       winged: group.tier === "flying",
@@ -81,12 +111,10 @@ function drawGroupRow(
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.font = `${14 * scale}px ${FONT_STACK}`;
+    ctx.font = `${ICON_RADIUS_BASELINE * 2 * LABEL_FONT_SCALE * scale}px ${FONT_STACK}`;
     ctx.fillStyle = rgba(MAGENTA_CORE, 0.9 * alpha);
-    ctx.fillText(`×${group.count}`, iconX + radius + 6 * scale, y);
-
-    slotCenterX += SLOT_WIDTH * scale;
-  }
+    ctx.fillText(`×${group.count}`, anchorX + radius + 6 * scale, y);
+  });
 }
 
 export function drawWaveIntel(
@@ -107,6 +135,6 @@ export function drawWaveIntel(
     const groups = groupsFor(game, ex, ey);
     if (groups.length === 0) return;
     const anchor = vessels[i].samples[0];
-    drawGroupRow(ctx, groups, anchor.x, anchor.y, scale, t, alpha);
+    drawGroupColumn(ctx, groups, anchor.x, anchor.y, scale, t, alpha);
   });
 }
