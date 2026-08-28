@@ -37,8 +37,8 @@ export const RESOURCE_ORB_LIFETIME = 6; // seconds
 export const ORB_DRIFT_CELLS_PER_SECOND = 0.35;
 
 export const TOTAL_WAVES = 8;
-export const PREP_SECONDS = 20;
-export const EARLY_CALL_RESOURCE_PER_SECOND = 3;
+export const PREP_SECONDS = 3;
+export const EARLY_CALL_RESOURCE_PER_SECOND = 8;
 export const SPAWN_INTERVAL_SECONDS = 0.6;
 
 // --- The four cell types (A rapid / B blocker / C heavy / D splash) ---
