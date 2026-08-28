@@ -16,6 +16,7 @@ import { drawPathLength } from "./render/pathlen";
 import { drawEnding } from "./render/ending";
 import { drawGrid } from "./render/grid";
 import { drawHeart } from "./render/heart";
+import { hudFadeAlpha } from "./render/hudfade";
 import { drawScoreSidebar } from "./render/score";
 import { drawSelector } from "./render/selector";
 import { tickShake } from "./render/shake";
@@ -48,13 +49,32 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   drawFx(ctx, game, layout, t);
   drawImpactFx(ctx, game, layout, t);
   drawCoreFlash(ctx, game, width, height, t);
+
+  const fade = hudFadeAlpha(game, t);
+  ctx.save();
+  ctx.globalAlpha = fade;
   drawPathLength(ctx, game, layout, t);
+  ctx.restore();
+
   drawCallDot(ctx, game, layout, t);
   drawWaveBanner(ctx, game, layout, width, height, t);
   drawNumbers(ctx, game, layout, width, t);
+
+  ctx.save();
+  ctx.globalAlpha = fade;
   drawSelector(ctx, game, layout, t);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = fade;
   drawScoreSidebar(ctx, game, layout, t);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = fade;
   drawHearts(ctx, game, layout, t);
+  ctx.restore();
+
   drawCombo(ctx, game, layout, width, height, t);
 
   ctx.restore();

@@ -8,7 +8,7 @@ import type { Game, GameStatus } from "../game";
 import { playEnding } from "../audio";
 import { drawHeartShape } from "./heart";
 import { cellCenter, scaleFor, type Layout } from "./layout";
-import { CYAN, CYAN_CORE, MAGENTA, MAGENTA_CORE, mix, rgba } from "./palette";
+import { AMBER, AMBER_CORE, CYAN, CYAN_CORE, MAGENTA, MAGENTA_CORE, mix, rgba } from "./palette";
 import { getHighScore } from "./score";
 
 const FONT_STACK = '"IBM Plex Mono", ui-monospace, monospace';
@@ -67,11 +67,11 @@ function drawStars(
     ctx.scale(Math.max(0.001, p), Math.max(0.001, p));
     traceStar(ctx, 16 * scale);
     if (i < earned) {
-      ctx.fillStyle = rgba(CYAN_CORE, 0.9);
+      ctx.fillStyle = rgba(AMBER_CORE, 0.9);
       ctx.fill();
-      ctx.strokeStyle = rgba(CYAN_CORE, 0.9);
+      ctx.strokeStyle = rgba(AMBER_CORE, 0.9);
     } else {
-      ctx.strokeStyle = rgba(CYAN, 0.35);
+      ctx.strokeStyle = rgba(AMBER, 0.2);
     }
     ctx.lineWidth = 1.5;
     ctx.stroke();
