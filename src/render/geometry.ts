@@ -119,6 +119,72 @@ export function sampleOpenCatmullRom(points: Point[], count: number): PathSample
   return samples;
 }
 
+/** Chaikin corner-cutting: each pass replaces every edge with two points 1/4
+ *  and 3/4 of the way along it, rounding off every corner a little more each
+ *  iteration. Endpoints are left exactly in place so a channel still starts
+ *  and ends where it's supposed to. */
+export function chaikinSmooth(points: Point[], iterations: number): Point[] {
+  let current = points;
+  for (let iter = 0; iter < iterations; iter++) {
+    if (current.length < 3) break;
+    const next: Point[] = [current[0]];
+    for (let i = 0; i < current.length - 1; i++) {
+      const p0 = current[i];
+      const p1 = current[i + 1];
+      next.push({ x: p0.x * 0.75 + p1.x * 0.25, y: p0.y * 0.75 + p1.y * 0.25 });
+      next.push({ x: p0.x * 0.25 + p1.x * 0.75, y: p0.y * 0.25 + p1.y * 0.75 });
+    }
+    next.push(current[current.length - 1]);
+    current = next;
+  }
+  return current;
+}
+
+/** Resample a polyline into `count` evenly arc-length-spaced points, each
+ *  carrying the unit normal of its local segment — same output shape as
+ *  sampleOpenCatmullRom, but for a plain polyline (e.g. one already rounded
+ *  off by chaikinSmooth) rather than a spline needing its own curve fit. */
+export function resampleByArcLength(points: Point[], count: number): PathSample[] {
+  if (points.length === 0) return [];
+  if (points.length === 1) {
+    const p = points[0];
+    return Array.from({ length: count }, (_, i) => ({
+      x: p.x,
+      y: p.y,
+      nx: 0,
+      ny: -1,
+      t: count > 1 ? i / (count - 1) : 0,
+    }));
+  }
+  const cumLen: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cumLen.push(cumLen[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  const totalLen = cumLen[cumLen.length - 1] || 1;
+  const samples: PathSample[] = [];
+  let segIndex = 0;
+  for (let i = 0; i < count; i++) {
+    const targetLen = (count > 1 ? i / (count - 1) : 0) * totalLen;
+    while (segIndex < cumLen.length - 2 && cumLen[segIndex + 1] < targetLen) segIndex++;
+    const segStart = cumLen[segIndex];
+    const segEnd = cumLen[segIndex + 1] ?? segStart;
+    const frac = Math.max(0, Math.min(1, (targetLen - segStart) / (segEnd - segStart || 1)));
+    const p0 = points[segIndex];
+    const p1 = points[segIndex + 1] ?? p0;
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    samples.push({
+      x: p0.x + dx * frac,
+      y: p0.y + dy * frac,
+      nx: -dy / len,
+      ny: dx / len,
+      t: count > 1 ? i / (count - 1) : 0,
+    });
+  }
+  return samples;
+}
+
 /** Trace a rounded square (used for the placeable-cell highlight) into the current path. */
 export function tracePlaceableSquare(
   ctx: CanvasRenderingContext2D,

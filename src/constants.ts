@@ -27,8 +27,8 @@ export function entranceTier(x: number, y: number): EntranceTier {
   return isMajor ? "major" : "minor";
 }
 
-export const MAJOR_VESSEL_WIDTH_CELLS = 1.6;
-export const MINOR_VESSEL_WIDTH_CELLS = 0.7;
+export const MAJOR_VESSEL_WIDTH_CELLS = 2.2;
+export const MINOR_VESSEL_WIDTH_CELLS = 0.55;
 
 export const CORE_MAX_HP = 12;
 export const START_RESOURCE = 130;

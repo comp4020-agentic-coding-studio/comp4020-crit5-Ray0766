@@ -6,8 +6,8 @@ export const MAGENTA = "255,47,166";
 export const MAGENTA_CORE = "255,217,239";
 export const AMBER = "255,182,58";
 export const AMBER_CORE = "255,242,208";
-export const VESSEL = "105,120,135";
-export const VESSEL_GRAIN = "190,235,235";
+export const VESSEL = "150,60,80";
+export const VESSEL_GRAIN = "255,150,170";
 export const GRID_LINE = "90,255,215";
 
 export function rgba(base: string, alpha: number): string {

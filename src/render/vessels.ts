@@ -9,7 +9,7 @@ import {
 } from "../constants";
 import type { Game } from "../game";
 import { tracePathFromEntrance } from "../pathing";
-import { mulberry32, sampleOpenCatmullRom, type PathSample, type Point } from "./geometry";
+import { chaikinSmooth, mulberry32, resampleByArcLength, type PathSample, type Point } from "./geometry";
 import { cellCenter, scaleFor, type Layout } from "./layout";
 import { rgba, VESSEL, VESSEL_GRAIN } from "./palette";
 
@@ -79,7 +79,7 @@ export function computeVesselPaths(game: Game, layout: Layout, t: number): Vesse
           const [px, py] = cellCenter(layout, x, y);
           return { x: px, y: py };
         });
-        const targetSamples = sampleOpenCatmullRom(points, SAMPLE_COUNT);
+        const targetSamples = resampleByArcLength(chaikinSmooth(points, 3), SAMPLE_COUNT);
         const fromSamples = state ? currentDisplay(state, t) : targetSamples;
         state = { tier, width, rawKey, fromSamples, targetSamples, transitionStart: t };
         states.set(key, state);
@@ -90,11 +90,14 @@ export function computeVesselPaths(game: Game, layout: Layout, t: number): Vesse
       // of nothing rather than assume it can't.
       const [ax, ay] = cellCenter(layout, ex, ey);
       const [bx, by] = cellCenter(layout, CORE_X, CORE_Y);
-      const samples = sampleOpenCatmullRom(
-        [
-          { x: ax, y: ay },
-          { x: bx, y: by },
-        ],
+      const samples = resampleByArcLength(
+        chaikinSmooth(
+          [
+            { x: ax, y: ay },
+            { x: bx, y: by },
+          ],
+          3,
+        ),
         SAMPLE_COUNT,
       );
       state = { tier, width, rawKey: "", fromSamples: samples, targetSamples: samples, transitionStart: t };
@@ -122,11 +125,13 @@ export function drawVessels(
   ctx.fillRect(0, 0, width, height);
 
   const scale = scaleFor(layout);
+  // Alphas are 0.6x the pre-round-7 values, so vessels stay clearly dimmer
+  // than both the heart and the cells.
   const passes: ReadonlyArray<readonly [number, number]> = [
-    [2.3, 0.05],
-    [1.5, 0.08],
-    [0.9, 0.11],
-    [0.42, 0.16],
+    [2.3, 0.03],
+    [1.5, 0.048],
+    [0.9, 0.066],
+    [0.42, 0.096],
   ];
 
   for (const vessel of vessels) {
@@ -144,18 +149,19 @@ export function drawVessels(
       ctx.restore();
     }
 
-    // Major mouths run brighter and wider, since they're the ones an elite
-    // (or the wave-8 boss) is about to come out of.
-    const mouthBoost = vessel.tier === "major" ? 1.5 : 1;
-    const mouth = vessel.samples[0];
-    const mouthRadius = vessel.width * 1.6 * mouthBoost;
-    const gradient = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, mouthRadius);
-    gradient.addColorStop(0, rgba(VESSEL, 0.14 * mouthBoost));
-    gradient.addColorStop(1, rgba(VESSEL, 0));
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(mouth.x, mouth.y, mouthRadius, 0, Math.PI * 2);
-    ctx.fill();
+    // Only major mouths get the glow — they're the ones an elite (or the
+    // wave-8 boss) is about to come out of; minor mouths draw nothing extra.
+    if (vessel.tier === "major") {
+      const mouth = vessel.samples[0];
+      const mouthRadius = vessel.width * 2.2;
+      const gradient = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, mouthRadius);
+      gradient.addColorStop(0, rgba(VESSEL, 0.084));
+      gradient.addColorStop(1, rgba(VESSEL, 0));
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(mouth.x, mouth.y, mouthRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
