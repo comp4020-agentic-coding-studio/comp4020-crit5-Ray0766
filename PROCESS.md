@@ -71,3 +71,17 @@ dragging merges.
    --- and made a kill credit resource the instant it happens, with an amber
    floater and a HUD punch standing in for the old "watch it land" feedback.
    [bd0ae4a](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/bd0ae4a)
+
+6. This one came from a slow stretch rather than a busy one. Early waves only
+   have a handful of normal pathogens trickling in one at a time, and the
+   three-second prep window between waves has nothing happening in it at all
+   --- I caught myself just watching the screen wait for the next spawn
+   instead of actually deciding anything. A cosmetic "fast" label wouldn't
+   have fixed that, since the thing dragging was the sim itself, not my
+   perception of it. So I put one `timeScale` multiplier in the single place
+   `dt` gets consumed inside `Game.update`, instead of a UI trick or a pile of
+   per-system speed knobs, so every timer in the game speeds up together
+   automatically and I didn't have to go find each one individually. Forced
+   it back to 1x the instant the run ends too, so a boss fight I fast-forward
+   through doesn't leave the win screen playing out sped up as well.
+   [01cb506](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-Ray0766/commit/01cb506)
