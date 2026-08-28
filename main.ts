@@ -43,7 +43,7 @@ function frame(now: number): void {
   last = now;
   game.update(dt);
   draw(ctx, game, canvas.width, canvas.height);
-  if (shouldAutoRestart(game, now / 1000)) game.reset();
+  if (shouldAutoRestart(game, game.clock)) game.reset();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

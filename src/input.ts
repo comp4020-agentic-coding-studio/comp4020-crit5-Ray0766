@@ -5,6 +5,7 @@ import { cellIndex } from "./pathing";
 import { computeLayout, type Layout } from "./render";
 import { callDotHitTest } from "./render/calldot";
 import { getSelectedKind, selectorHitTest, setSelectedKind } from "./render/selector";
+import { speedControlHitTest } from "./render/speedcontrol";
 
 const DRAG_THRESHOLD_PX = 8;
 
@@ -51,6 +52,10 @@ export function attachInput(canvas: HTMLCanvasElement, game: Game): void {
     }
     if (callDotHitTest(game, layout, px, py)) {
       game.callWaveEarly();
+      return;
+    }
+    if (speedControlHitTest(layout, px, py)) {
+      game.cycleTimeScale();
       return;
     }
     const { gx, gy } = toGridCoords(px, py, layout);

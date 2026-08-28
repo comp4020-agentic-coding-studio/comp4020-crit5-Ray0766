@@ -135,6 +135,13 @@ export class Game {
   status: GameStatus = "playing";
   score = 0;
 
+  // A single global multiplier fed into dt before anything else touches it —
+  // every time-based system (movement, cooldowns, timers, render-side
+  // pulses) inherits it for free just by consuming the scaled dt/clock,
+  // instead of each one growing its own speed knob.
+  timeScale = 1;
+  clock = 0;
+
   waveNumber = 0; // 0 = before the first wave
   waveSpawnedCount = 0;
   spawnTimer = 0;
@@ -269,6 +276,14 @@ export class Game {
     this.resource += 400; // enough to throw a few units down before it arrives
   }
 
+  /** Cycles the global speed control: 1x -> 2x -> 3x -> 1x. Called only from
+   *  the speed-control UI's click handler; update() forces this back to 1x
+   *  whenever the run isn't actively playing, so there's nothing else to
+   *  special-case here. */
+  cycleTimeScale(): void {
+    this.timeScale = this.timeScale >= 3 ? 1 : this.timeScale + 1;
+  }
+
   /** Start a fresh run in place, so anything holding onto this Game instance
    *  (input listeners, the frame loop) doesn't need to be re-wired. */
   reset(): void {
@@ -287,9 +302,20 @@ export class Game {
     this.waveSpawnedCount = 0;
     this.spawnTimer = 0;
     this.prepTimer = PREP_SECONDS;
+    this.timeScale = 1;
   }
 
-  update(dt: number): void {
+  /** rawDt is real, unscaled wall-clock delta from the frame loop — timeScale
+   *  is applied here, in exactly one place, rather than by changing the
+   *  frame loop's cadence or scattering multipliers into individual systems.
+   *  clock keeps advancing (at 1x, forced below) even once the run ends, so
+   *  the ending sequence's own timing — driven by this same clock via
+   *  render.ts — always plays at normal speed regardless of what timeScale
+   *  was set to when the run ended. */
+  update(rawDt: number): void {
+    if (this.status !== "playing") this.timeScale = 1;
+    const dt = rawDt * this.timeScale;
+    this.clock += dt;
     if (this.status !== "playing") return;
 
     this.updateWaveSpawner(dt);

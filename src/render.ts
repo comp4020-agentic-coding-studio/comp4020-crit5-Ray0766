@@ -18,6 +18,7 @@ import { drawHeart } from "./render/heart";
 import { hudFadeAlpha } from "./render/hudfade";
 import { drawScoreSidebar } from "./render/score";
 import { drawSelector } from "./render/selector";
+import { drawSpeedControl } from "./render/speedcontrol";
 import { tickShake } from "./render/shake";
 import { drawAttackTrails } from "./render/trails";
 import { computeVesselPaths, drawVessels, drawVesselParticles } from "./render/vessels";
@@ -26,7 +27,7 @@ export { computeLayout, type Layout };
 
 export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, height: number): void {
   const layout = computeLayout(width, height);
-  const t = performance.now() / 1000;
+  const t = game.clock;
 
   const vessels = computeVesselPaths(game, layout, t);
   drawVessels(ctx, width, height, layout, vessels);
@@ -71,6 +72,11 @@ export function draw(ctx: CanvasRenderingContext2D, game: Game, width: number, h
   ctx.save();
   ctx.globalAlpha = fade;
   drawHearts(ctx, game, layout, t);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = fade;
+  drawSpeedControl(ctx, game, layout, t);
   ctx.restore();
 
   drawCombo(ctx, game, layout, width, height, t);
